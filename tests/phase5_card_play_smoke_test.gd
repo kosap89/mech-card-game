@@ -8,6 +8,7 @@ var failures: Array[String] = []
 
 func _init() -> void:
 	seed(54321)
+	_test_ui_interaction_path()
 	var controller: MatchController = MatchControllerScript.new()
 	controller.balance = load("res://data/balance/default_balance.tres")
 	controller.test_deck = load("res://data/cards/test_deck.tres")
@@ -88,6 +89,25 @@ func _init() -> void:
 		for failure in failures:
 			push_error(failure)
 		quit(1)
+
+
+func _test_ui_interaction_path() -> void:
+	var main_scene: Control = load("res://scenes/main/main.tscn").instantiate()
+	var controller: MatchController = main_scene.get_node("MatchController")
+	controller._ready()
+	main_scene.match_controller = controller
+	main_scene._ready()
+	var original_button: Button = main_scene.p1_hand_container.get_child(0)
+	var selected_card: CardData = controller.player_1.hand[0]
+	controller.player_1.add_scrap(10.0)
+	_check(is_instance_valid(original_button) and original_button.get_parent() == main_scene.p1_hand_container, "Scrap updates do not rebuild hand controls during a click")
+	original_button.pressed.emit()
+	_check(main_scene.selected_cards[1] == selected_card, "Hand Button signal stores the selected CardData reference")
+	_check("Selected card: %s" % selected_card.display_name in main_scene.p1_selected_label.text, "Selected-card feedback updates")
+	main_scene.p1_slot_buttons[0].pressed.emit()
+	_check(controller.player_1.mech.slots[0] != null, "Slot Button signal completes card installation")
+	_check(main_scene.selected_cards[1] == null, "Successful UI installation clears selection")
+	main_scene.free()
 
 
 func _all_slots_empty(mech: MechState) -> bool:

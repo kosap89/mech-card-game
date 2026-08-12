@@ -198,7 +198,7 @@ func _on_spend_scrap_pressed(player_number: int) -> void:
 
 
 func _on_scrap_changed(_current_scrap: float) -> void:
-	_refresh()
+	_refresh_scrap()
 
 
 func _on_cards_changed(_deck_count: int, _hand_count: int) -> void:
@@ -293,6 +293,11 @@ func _clear_invalid_selections() -> void:
 			selected_cards[player_number] = null
 
 
+func _refresh_scrap() -> void:
+	p1_scrap.text = "SCRAP: %.1f" % match_controller.player_1.current_scrap
+	p2_scrap.text = "SCRAP: %.1f" % match_controller.player_2.current_scrap
+
+
 func _refresh() -> void:
 	state_label.text = "State: %s" % match_controller.get_state_name()
 	result_label.text = match_controller.result_text
@@ -300,12 +305,11 @@ func _refresh() -> void:
 	p1_health_bar.max_value = match_controller.player_1.mech.max_health
 	p1_health_bar.value = match_controller.player_1.mech.current_health
 	p1_damage.text = "Total mech damage dealt: %d" % match_controller.player_1.total_mech_damage_dealt
-	p1_scrap.text = "SCRAP: %.1f" % match_controller.player_1.current_scrap
+	_refresh_scrap()
 	p2_health.text = "Health: %d / %d" % [match_controller.player_2.mech.current_health, match_controller.player_2.mech.max_health]
 	p2_health_bar.max_value = match_controller.player_2.mech.max_health
 	p2_health_bar.value = match_controller.player_2.mech.current_health
 	p2_damage.text = "Total mech damage dealt: %d" % match_controller.player_2.total_mech_damage_dealt
-	p2_scrap.text = "SCRAP: %.1f" % match_controller.player_2.current_scrap
 	var active := match_controller.match_state == MatchController.MatchState.ACTIVE
 	p1_hit_button.disabled = not active
 	p2_hit_button.disabled = not active
