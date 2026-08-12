@@ -20,7 +20,7 @@ Many of these mechanics are planned and are not implemented yet.
 
 ## Current prototype status
 
-The current Phase 1–2 prototype includes:
+The current Phase 1–3 prototype includes:
 
 - A Godot project that launches successfully
 - A local match state
@@ -30,12 +30,13 @@ The current Phase 1–2 prototype includes:
 - Winner and draw calculation
 - Match restart logic
 - Temporary debug damage controls
+- Independently generated Scrap for both players
+- Scrap affordability, spending, and debug-testing controls
 
-Cards, Scrap, automatic combat, AI, and other later gameplay systems are not implemented.
+Cards, automatic combat, AI, and other later gameplay systems are not implemented.
 
 ## Planned MVP systems
 
-- Scrap generation
 - Cards and hand
 - Automatic card draw
 - Installing mech parts

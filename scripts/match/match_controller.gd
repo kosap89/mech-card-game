@@ -19,14 +19,18 @@ var result_text := ""
 
 func _ready() -> void:
 	assert(balance != null, "MatchController requires a BalanceConfig resource.")
-	player_1 = PlayerState.new(1, balance.mech_max_health)
-	player_2 = PlayerState.new(2, balance.mech_max_health)
+	player_1 = PlayerState.new(1, balance.mech_max_health, balance.starting_scrap)
+	player_2 = PlayerState.new(2, balance.mech_max_health, balance.starting_scrap)
 	start_match()
 
 
 func _process(delta: float) -> void:
 	if match_state != MatchState.ACTIVE:
 		return
+	var active_delta := minf(delta, remaining_seconds)
+	var generated_scrap := balance.scrap_per_second * active_delta
+	player_1.add_scrap(generated_scrap)
+	player_2.add_scrap(generated_scrap)
 	remaining_seconds = maxf(0.0, remaining_seconds - delta)
 	time_changed.emit(remaining_seconds)
 	if is_zero_approx(remaining_seconds):
@@ -46,6 +50,29 @@ func start_match() -> void:
 
 func restart_match() -> void:
 	start_match()
+
+
+func add_debug_scrap(player_number: int) -> void:
+	if match_state != MatchState.ACTIVE:
+		return
+	var player := get_player(player_number)
+	if player != null:
+		player.add_scrap(balance.debug_scrap_amount)
+
+
+func spend_debug_scrap(player_number: int) -> bool:
+	if match_state != MatchState.ACTIVE:
+		return false
+	var player := get_player(player_number)
+	return player != null and player.spend_scrap(balance.debug_scrap_amount)
+
+
+func get_player(player_number: int) -> PlayerState:
+	if player_number == 1:
+		return player_1
+	if player_number == 2:
+		return player_2
+	return null
 
 
 # Presentation calls this temporary test hook; it is not a gameplay action.
