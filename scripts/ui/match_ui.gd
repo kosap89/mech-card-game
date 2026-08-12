@@ -9,10 +9,14 @@ var p1_health: Label
 var p1_health_bar: ProgressBar
 var p1_damage: Label
 var p1_scrap: Label
+var p1_hand_container: HBoxContainer
+var p1_card_debug: Label
 var p2_health: Label
 var p2_health_bar: ProgressBar
 var p2_damage: Label
 var p2_scrap: Label
+var p2_hand_container: HBoxContainer
+var p2_card_debug: Label
 var p1_hit_button: Button
 var p2_hit_button: Button
 var scrap_debug_buttons: Array[Button] = []
@@ -24,6 +28,8 @@ func _ready() -> void:
 	match_controller.state_changed.connect(_refresh)
 	match_controller.player_1.scrap_changed.connect(_on_scrap_changed)
 	match_controller.player_2.scrap_changed.connect(_on_scrap_changed)
+	match_controller.player_1.cards_changed.connect(_on_cards_changed)
+	match_controller.player_2.cards_changed.connect(_on_cards_changed)
 	_refresh()
 
 
@@ -38,7 +44,7 @@ func _build_placeholder_ui() -> void:
 	var root := VBoxContainer.new()
 	root.add_theme_constant_override("separation", 10)
 	margin.add_child(root)
-	root.add_child(_label("MECH CARD GAME - PHASE 3 TEST MATCH", 24))
+	root.add_child(_label("MECH CARD GAME - PHASE 4 TEST MATCH", 24))
 	timer_label = _label("3:00", 36)
 	root.add_child(timer_label)
 	state_label = _label("", 16)
@@ -55,11 +61,15 @@ func _build_placeholder_ui() -> void:
 	p1_health_bar = p1_widgets[1]
 	p1_damage = p1_widgets[2]
 	p1_scrap = p1_widgets[3]
+	p1_hand_container = p1_widgets[4]
+	p1_card_debug = p1_widgets[5]
 	var p2_widgets := _build_player_panel(players, 2)
 	p2_health = p2_widgets[0]
 	p2_health_bar = p2_widgets[1]
 	p2_damage = p2_widgets[2]
 	p2_scrap = p2_widgets[3]
+	p2_hand_container = p2_widgets[4]
+	p2_card_debug = p2_widgets[5]
 	_build_debug_panel(root)
 
 
@@ -91,7 +101,18 @@ func _build_player_panel(parent: Control, player_number: int) -> Array:
 		slot.custom_minimum_size = Vector2(0, 52)
 		slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		slots.add_child(slot)
-	return [health_label, health_bar, damage_label, scrap_label]
+	box.add_child(_label("HAND - informational only; cards are not playable", 15))
+	var hand_scroll := ScrollContainer.new()
+	hand_scroll.custom_minimum_size.y = 70
+	hand_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	hand_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	box.add_child(hand_scroll)
+	var hand_container := HBoxContainer.new()
+	hand_container.add_theme_constant_override("separation", 6)
+	hand_scroll.add_child(hand_container)
+	var card_debug := _label("Deck: 0 | Hand: 0", 14)
+	box.add_child(card_debug)
+	return [health_label, health_bar, damage_label, scrap_label, hand_container, card_debug]
 
 
 func _build_debug_panel(parent: Control) -> void:
@@ -161,6 +182,28 @@ func _on_scrap_changed(_current_scrap: float) -> void:
 	_refresh()
 
 
+func _on_cards_changed(_deck_count: int, _hand_count: int) -> void:
+	_refresh_cards()
+
+
+func _refresh_cards() -> void:
+	_refresh_player_cards(match_controller.player_1, p1_hand_container, p1_card_debug)
+	_refresh_player_cards(match_controller.player_2, p2_hand_container, p2_card_debug)
+
+
+func _refresh_player_cards(player: PlayerState, container: HBoxContainer, debug_label: Label) -> void:
+	for child in container.get_children():
+		child.queue_free()
+	for card in player.hand:
+		var card_display := Button.new()
+		card_display.text = "%s\nCost: %.0f" % [card.display_name, card.cost]
+		card_display.disabled = true
+		card_display.tooltip_text = "Card playing is not implemented yet."
+		card_display.custom_minimum_size = Vector2(105, 58)
+		container.add_child(card_display)
+	debug_label.text = "DEVELOPMENT CARD INFO - Deck: %d | Hand: %d" % [player.deck.size(), player.hand.size()]
+
+
 func _refresh() -> void:
 	state_label.text = "State: %s" % match_controller.get_state_name()
 	result_label.text = match_controller.result_text
@@ -179,3 +222,4 @@ func _refresh() -> void:
 	p2_hit_button.disabled = not active
 	for button in scrap_debug_buttons:
 		button.disabled = not active
+	_refresh_cards()

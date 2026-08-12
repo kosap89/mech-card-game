@@ -9,6 +9,7 @@ var failures: Array[String] = []
 func _init() -> void:
 	var controller: MatchController = MatchControllerScript.new()
 	controller.balance = load("res://data/balance/default_balance.tres")
+	controller.test_deck = load("res://data/cards/test_deck.tres")
 	controller._ready()
 
 	_check(is_equal_approx(controller.player_1.current_scrap, controller.balance.starting_scrap), "Player 1 starts with configured Scrap")

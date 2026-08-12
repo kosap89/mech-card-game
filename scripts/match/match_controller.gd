@@ -9,6 +9,7 @@ signal state_changed
 enum MatchState { READY, ACTIVE, ENDED }
 
 @export var balance: BalanceConfig
+@export var test_deck: CardDeckDefinition
 
 var player_1: PlayerState
 var player_2: PlayerState
@@ -19,8 +20,9 @@ var result_text := ""
 
 func _ready() -> void:
 	assert(balance != null, "MatchController requires a BalanceConfig resource.")
-	player_1 = PlayerState.new(1, balance.mech_max_health, balance.starting_scrap)
-	player_2 = PlayerState.new(2, balance.mech_max_health, balance.starting_scrap)
+	assert(test_deck != null, "MatchController requires a CardDeckDefinition resource.")
+	player_1 = PlayerState.new(1, balance.mech_max_health, balance.starting_scrap, test_deck, balance.draw_interval_seconds)
+	player_2 = PlayerState.new(2, balance.mech_max_health, balance.starting_scrap, test_deck, balance.draw_interval_seconds)
 	start_match()
 
 
@@ -31,6 +33,8 @@ func _process(delta: float) -> void:
 	var generated_scrap := balance.scrap_per_second * active_delta
 	player_1.add_scrap(generated_scrap)
 	player_2.add_scrap(generated_scrap)
+	player_1.advance_card_draw(active_delta)
+	player_2.advance_card_draw(active_delta)
 	remaining_seconds = maxf(0.0, remaining_seconds - delta)
 	time_changed.emit(remaining_seconds)
 	if is_zero_approx(remaining_seconds):
@@ -38,8 +42,8 @@ func _process(delta: float) -> void:
 
 
 func start_match() -> void:
-	player_1.reset()
-	player_2.reset()
+	player_1.reset(balance.starting_hand_size)
+	player_2.reset(balance.starting_hand_size)
 	remaining_seconds = balance.match_duration_seconds
 	result_text = ""
 	match_state = MatchState.ACTIVE
