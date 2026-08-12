@@ -79,6 +79,15 @@ func get_player(player_number: int) -> PlayerState:
 	return null
 
 
+func try_play_card(player_number: int, card: CardData, slot_index: int) -> int:
+	if match_state != MatchState.ACTIVE:
+		return PlayerState.PlayPartResult.INVALID_CARD
+	var player := get_player(player_number)
+	if player == null:
+		return PlayerState.PlayPartResult.INVALID_CARD
+	return player.try_play_part(card, slot_index)
+
+
 # Presentation calls this temporary test hook; it is not a gameplay action.
 func deal_debug_damage(attacking_player_number: int, amount: int = -1) -> int:
 	if match_state != MatchState.ACTIVE or attacking_player_number not in [1, 2]:

@@ -20,7 +20,7 @@ Many of these mechanics are planned and are not implemented yet.
 
 ## Current prototype status
 
-The current Phase 1–4 prototype includes:
+The current Phase 1–5 prototype includes:
 
 - A Godot project that launches successfully
 - A local match state
@@ -35,12 +35,14 @@ The current Phase 1–4 prototype includes:
 - Data-driven placeholder card definitions
 - Per-player shuffled test decks and starting hands
 - Automatic card drawing during active matches
+- Card selection with enforced Scrap costs
+- Installation of part cards into empty generic mech slots
 
-Cards are visible but are not playable yet. Card effects, automatic combat, AI, and other later gameplay systems are not implemented.
+Installed parts currently have no combat behavior. Replace, Trash, card effects, automatic combat, AI, and other later gameplay systems are not implemented.
+All current placeholder cards are temporarily treated as installable `PART` cards for MVP testing.
 
 ## Planned MVP systems
 
-- Installing mech parts
 - Automatic combat
 - Trash
 - Replace

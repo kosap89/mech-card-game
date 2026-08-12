@@ -1,6 +1,15 @@
 class_name PlayerState
 extends RefCounted
 
+enum PlayPartResult {
+	SUCCESS,
+	INVALID_CARD,
+	INVALID_SLOT,
+	SLOT_OCCUPIED,
+	NOT_ENOUGH_SCRAP,
+	NOT_A_PART,
+}
+
 signal damage_total_changed(total: int)
 signal scrap_changed(current_scrap: float)
 signal cards_changed(deck_count: int, hand_count: int)
@@ -79,6 +88,25 @@ func remove_card_from_hand(card: CardData) -> bool:
 	hand.remove_at(card_index)
 	cards_changed.emit(deck.size(), hand.size())
 	return true
+
+
+func try_play_part(card: CardData, slot_index: int) -> int:
+	if card == null or hand.find(card) < 0:
+		return PlayPartResult.INVALID_CARD
+	if card.card_type != CardData.CardType.PART:
+		return PlayPartResult.NOT_A_PART
+	if not mech.is_valid_slot(slot_index):
+		return PlayPartResult.INVALID_SLOT
+	if not mech.is_slot_empty(slot_index):
+		return PlayPartResult.SLOT_OCCUPIED
+	if not can_afford(card.cost):
+		return PlayPartResult.NOT_ENOUGH_SCRAP
+	if not spend_scrap(card.cost):
+		return PlayPartResult.NOT_ENOUGH_SCRAP
+	remove_card_from_hand(card)
+	var part := MechPart.new(card, self, slot_index)
+	mech.install_part(part, slot_index)
+	return PlayPartResult.SUCCESS
 
 
 func advance_card_draw(delta: float) -> void:
