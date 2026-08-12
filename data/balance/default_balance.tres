@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="BalanceConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/balance_config.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+match_duration_seconds = 180.0
+mech_max_health = 1000
+debug_damage_amount = 100
+end_match_when_mech_reaches_zero = false
