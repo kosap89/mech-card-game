@@ -18,6 +18,9 @@ extends Resource
 @export_range(0, 100, 1) var starting_hand_size: int = 3
 @export_range(0.1, 60.0, 0.1) var draw_interval_seconds: float = 3.0
 
+# Temporary MVP opponent pacing. This is subject to gameplay testing.
+@export_range(0.1, 10.0, 0.1) var ai_decision_interval_seconds: float = 1.0
+
 # TODO(game design): Define maximum hand size. Phase 4 leaves hands uncapped.
 # TODO(game design): Define empty-deck behavior. Phase 4 stops drawing when empty.
 

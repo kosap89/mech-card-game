@@ -46,6 +46,7 @@ func _ready() -> void:
 	match_controller.player_1.damage_total_changed.connect(_on_damage_total_changed)
 	match_controller.player_2.damage_total_changed.connect(_on_damage_total_changed)
 	match_controller.match_started.connect(_on_match_started)
+	match_controller.ai_card_played.connect(_on_ai_card_played)
 	_refresh()
 
 
@@ -60,7 +61,7 @@ func _build_placeholder_ui() -> void:
 	var root := VBoxContainer.new()
 	root.add_theme_constant_override("separation", 5)
 	margin.add_child(root)
-	root.add_child(_label("MECH CARD GAME - PHASE 7 TEST MATCH", 20))
+	root.add_child(_label("MECH CARD GAME - PHASE 8 TEST MATCH", 20))
 	timer_label = _label("3:00", 28)
 	root.add_child(timer_label)
 	state_label = _label("", 16)
@@ -104,7 +105,7 @@ func _build_player_panel(parent: Control, player_number: int) -> Array:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 4)
 	panel.add_child(box)
-	box.add_child(_label("PLAYER %d MECH" % player_number, 18))
+	box.add_child(_label("PLAYER %d - %s" % [player_number, "HUMAN" if player_number == 1 else "AI"], 18))
 	var health_label := _label("", 14)
 	box.add_child(health_label)
 	var health_bar := ProgressBar.new()
@@ -259,6 +260,9 @@ func _on_match_started() -> void:
 
 
 func _on_card_pressed(player_number: int, card: CardData) -> void:
+	if player_number != 1:
+		feedback_label.text = "Player 2 is controlled by the AI."
+		return
 	if match_controller.match_state != MatchController.MatchState.ACTIVE:
 		feedback_label.text = "Cards cannot be selected after the match ends."
 		return
@@ -268,6 +272,9 @@ func _on_card_pressed(player_number: int, card: CardData) -> void:
 
 
 func _on_slot_pressed(player_number: int, slot_index: int) -> void:
+	if player_number != 1:
+		feedback_label.text = "Player 2 slots are controlled by the AI."
+		return
 	var card: CardData = selected_cards[player_number]
 	if card == null:
 		feedback_label.text = "Select a Player %d card first." % player_number
@@ -294,6 +301,9 @@ func _on_slot_pressed(player_number: int, slot_index: int) -> void:
 
 
 func _on_trash_pressed(player_number: int, slot_index: int) -> void:
+	if player_number != 1:
+		feedback_label.text = "Player 2 is controlled by the AI."
+		return
 	var player := match_controller.get_player(player_number)
 	var part: MechPart = null if player == null or not player.mech.is_valid_slot(slot_index) else player.mech.slots[slot_index]
 	if part == null:
@@ -321,7 +331,7 @@ func _refresh_player_cards(player: PlayerState, container: HBoxContainer, debug_
 		var card_display := Button.new()
 		var selected: bool = selected_cards[player.player_number] == card
 		card_display.text = "%s%s\nCost: %.0f" % ["[SELECTED]\n" if selected else "", card.display_name, card.cost]
-		card_display.disabled = match_controller.match_state != MatchController.MatchState.ACTIVE
+		card_display.disabled = match_controller.match_state != MatchController.MatchState.ACTIVE or player.player_number != 1
 		card_display.pressed.connect(_on_card_pressed.bind(player.player_number, card))
 		card_display.custom_minimum_size = Vector2(105, 58)
 		container.add_child(card_display)
@@ -337,11 +347,19 @@ func _refresh_slots() -> void:
 
 func _refresh_player_slots(player: PlayerState, buttons: Array[Button], trash_buttons: Array[Button]) -> void:
 	var active := match_controller.match_state == MatchController.MatchState.ACTIVE
+	var human_controlled := player.player_number == 1
 	for slot_index in MechState.SLOT_COUNT:
 		var part: MechPart = player.mech.slots[slot_index]
 		buttons[slot_index].text = "Slot %d\n%s" % [slot_index + 1, "EMPTY" if part == null else "%s\nHP: %d / %d" % [part.card_data.display_name, part.current_health, part.max_health]]
-		buttons[slot_index].disabled = not active
-		trash_buttons[slot_index].disabled = not active or part == null
+		buttons[slot_index].disabled = not active or not human_controlled
+		trash_buttons[slot_index].disabled = not active or not human_controlled or part == null
+
+
+func _on_ai_card_played(card_name: String, slot_index: int, replaced: bool, old_part_name: String) -> void:
+	if replaced:
+		feedback_label.text = "AI replaced %s with %s in Slot %d." % [old_part_name, card_name, slot_index + 1]
+	else:
+		feedback_label.text = "AI installed %s in Slot %d." % [card_name, slot_index + 1]
 
 
 func _clear_invalid_selections() -> void:

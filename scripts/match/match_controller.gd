@@ -5,6 +5,7 @@ signal match_started
 signal time_changed(remaining_seconds: float)
 signal match_ended(result_text: String)
 signal state_changed
+signal ai_card_played(card_name: String, slot_index: int, replaced: bool, old_part_name: String)
 
 enum MatchState { READY, ACTIVE, ENDED }
 
@@ -16,6 +17,7 @@ var player_2: PlayerState
 var remaining_seconds: float = 0.0
 var match_state: int = MatchState.READY
 var result_text := ""
+var opponent_ai: SimpleOpponentAI
 
 
 func _ready() -> void:
@@ -23,6 +25,8 @@ func _ready() -> void:
 	assert(test_deck != null, "MatchController requires a CardDeckDefinition resource.")
 	player_1 = PlayerState.new(1, balance.mech_max_health, balance.starting_scrap, test_deck, balance.draw_interval_seconds)
 	player_2 = PlayerState.new(2, balance.mech_max_health, balance.starting_scrap, test_deck, balance.draw_interval_seconds)
+	opponent_ai = SimpleOpponentAI.new(self, 2, balance.ai_decision_interval_seconds)
+	opponent_ai.card_played.connect(_on_ai_card_played)
 	start_match()
 
 
@@ -38,6 +42,8 @@ func _process(delta: float) -> void:
 	_update_player_combat(player_1, player_2, active_delta)
 	if match_state == MatchState.ACTIVE:
 		_update_player_combat(player_2, player_1, active_delta)
+	if match_state == MatchState.ACTIVE:
+		opponent_ai.advance(active_delta)
 	remaining_seconds = maxf(0.0, remaining_seconds - delta)
 	time_changed.emit(remaining_seconds)
 	if is_zero_approx(remaining_seconds):
@@ -50,6 +56,7 @@ func start_match() -> void:
 	remaining_seconds = balance.match_duration_seconds
 	result_text = ""
 	match_state = MatchState.ACTIVE
+	opponent_ai.reset()
 	match_started.emit()
 	time_changed.emit(remaining_seconds)
 	state_changed.emit()
@@ -162,3 +169,7 @@ func end_match() -> void:
 
 func get_state_name() -> String:
 	return ["Ready", "Match Active", "Match Ended"][match_state]
+
+
+func _on_ai_card_played(card_name: String, slot_index: int, replaced: bool, old_part_name: String) -> void:
+	ai_card_played.emit(card_name, slot_index, replaced, old_part_name)

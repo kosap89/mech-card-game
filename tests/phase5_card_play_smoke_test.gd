@@ -13,6 +13,7 @@ func _init() -> void:
 	controller.balance = load("res://data/balance/default_balance.tres")
 	controller.test_deck = load("res://data/cards/test_deck.tres")
 	controller._ready()
+	controller.opponent_ai.enabled = false
 
 	var player := controller.player_1
 	var first_card: CardData = player.hand[0]
@@ -95,6 +96,7 @@ func _test_ui_interaction_path() -> void:
 	var main_scene: Control = load("res://scenes/main/main.tscn").instantiate()
 	var controller: MatchController = main_scene.get_node("MatchController")
 	controller._ready()
+	controller.opponent_ai.enabled = false
 	main_scene.match_controller = controller
 	main_scene._ready()
 	var original_button: Button = main_scene.p1_hand_container.get_child(0)

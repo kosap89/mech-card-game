@@ -11,6 +11,7 @@ func _init() -> void:
 	controller.balance = load("res://data/balance/default_balance.tres")
 	controller.test_deck = load("res://data/cards/test_deck.tres")
 	controller._ready()
+	controller.opponent_ai.enabled = false
 
 	_check(controller.player_1.deck_definition != null and controller.player_2.deck_definition != null, "Both players receive a deck definition")
 	_check(controller.player_1.hand.size() == controller.balance.starting_hand_size, "Player 1 receives the starting hand")

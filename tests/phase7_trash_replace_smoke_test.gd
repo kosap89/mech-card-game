@@ -97,6 +97,7 @@ func _new_controller() -> MatchController:
 	controller.balance = load("res://data/balance/default_balance.tres")
 	controller.test_deck = load("res://data/cards/test_deck.tres")
 	controller._ready()
+	controller.opponent_ai.enabled = false
 	return controller
 
 

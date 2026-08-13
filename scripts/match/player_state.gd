@@ -94,6 +94,22 @@ func remove_card_from_hand(card: CardData) -> bool:
 
 
 func try_play_part(card: CardData, slot_index: int, scrap_return_fraction: float = 0.0) -> int:
+	var validation_result := validate_play_part(card, slot_index, scrap_return_fraction)
+	if validation_result not in [PlayPartResult.SUCCESS, PlayPartResult.REPLACED]:
+		return validation_result
+	var old_part: MechPart = mech.slots[slot_index]
+	var scrap_return := 0.0 if old_part == null else calculate_scrap_return(old_part, scrap_return_fraction)
+	if old_part != null:
+		mech.take_part(slot_index)
+		add_scrap(scrap_return)
+	spend_scrap(card.cost)
+	remove_card_from_hand(card)
+	var part := MechPart.new(card, self, slot_index)
+	mech.install_part(part, slot_index)
+	return validation_result
+
+
+func validate_play_part(card: CardData, slot_index: int, scrap_return_fraction: float = 0.0) -> int:
 	if card == null or hand.find(card) < 0:
 		return PlayPartResult.INVALID_CARD
 	if card.card_type != CardData.CardType.PART:
@@ -104,13 +120,6 @@ func try_play_part(card: CardData, slot_index: int, scrap_return_fraction: float
 	var scrap_return := 0.0 if old_part == null else calculate_scrap_return(old_part, scrap_return_fraction)
 	if current_scrap + scrap_return < card.cost:
 		return PlayPartResult.NOT_ENOUGH_SCRAP
-	if old_part != null:
-		mech.take_part(slot_index)
-		add_scrap(scrap_return)
-	spend_scrap(card.cost)
-	remove_card_from_hand(card)
-	var part := MechPart.new(card, self, slot_index)
-	mech.install_part(part, slot_index)
 	return PlayPartResult.SUCCESS if old_part == null else PlayPartResult.REPLACED
 
 
