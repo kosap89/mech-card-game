@@ -46,6 +46,17 @@ func install_part(part: MechPart, slot_index: int) -> bool:
 	return true
 
 
+func take_part(slot_index: int) -> MechPart:
+	if not is_valid_slot(slot_index):
+		return null
+	var part: MechPart = slots[slot_index]
+	if part == null:
+		return null
+	slots[slot_index] = null
+	slots_changed.emit()
+	return part
+
+
 func damage_part(slot_index: int, amount: int) -> int:
 	if not is_valid_slot(slot_index):
 		return 0

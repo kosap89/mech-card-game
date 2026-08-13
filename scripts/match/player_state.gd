@@ -8,7 +8,10 @@ enum PlayPartResult {
 	SLOT_OCCUPIED,
 	NOT_ENOUGH_SCRAP,
 	NOT_A_PART,
+	REPLACED,
 }
+
+enum TrashPartResult { SUCCESS, INVALID_SLOT, EMPTY_SLOT }
 
 signal damage_total_changed(total: int)
 signal scrap_changed(current_scrap: float)
@@ -90,23 +93,43 @@ func remove_card_from_hand(card: CardData) -> bool:
 	return true
 
 
-func try_play_part(card: CardData, slot_index: int) -> int:
+func try_play_part(card: CardData, slot_index: int, scrap_return_fraction: float = 0.0) -> int:
 	if card == null or hand.find(card) < 0:
 		return PlayPartResult.INVALID_CARD
 	if card.card_type != CardData.CardType.PART:
 		return PlayPartResult.NOT_A_PART
 	if not mech.is_valid_slot(slot_index):
 		return PlayPartResult.INVALID_SLOT
-	if not mech.is_slot_empty(slot_index):
-		return PlayPartResult.SLOT_OCCUPIED
-	if not can_afford(card.cost):
+	var old_part: MechPart = mech.slots[slot_index]
+	var scrap_return := 0.0 if old_part == null else calculate_scrap_return(old_part, scrap_return_fraction)
+	if current_scrap + scrap_return < card.cost:
 		return PlayPartResult.NOT_ENOUGH_SCRAP
-	if not spend_scrap(card.cost):
-		return PlayPartResult.NOT_ENOUGH_SCRAP
+	if old_part != null:
+		mech.take_part(slot_index)
+		add_scrap(scrap_return)
+	spend_scrap(card.cost)
 	remove_card_from_hand(card)
 	var part := MechPart.new(card, self, slot_index)
 	mech.install_part(part, slot_index)
-	return PlayPartResult.SUCCESS
+	return PlayPartResult.SUCCESS if old_part == null else PlayPartResult.REPLACED
+
+
+func calculate_scrap_return(part: MechPart, scrap_return_fraction: float) -> float:
+	if part == null:
+		return 0.0
+	return part.card_data.cost * clampf(scrap_return_fraction, 0.0, 1.0)
+
+
+func try_trash_part(slot_index: int, scrap_return_fraction: float) -> int:
+	if not mech.is_valid_slot(slot_index):
+		return TrashPartResult.INVALID_SLOT
+	var part: MechPart = mech.slots[slot_index]
+	if part == null:
+		return TrashPartResult.EMPTY_SLOT
+	var scrap_return := calculate_scrap_return(part, scrap_return_fraction)
+	mech.take_part(slot_index)
+	add_scrap(scrap_return)
+	return TrashPartResult.SUCCESS
 
 
 func advance_card_draw(delta: float) -> void:

@@ -88,7 +88,16 @@ func try_play_card(player_number: int, card: CardData, slot_index: int) -> int:
 	var player := get_player(player_number)
 	if player == null:
 		return PlayerState.PlayPartResult.INVALID_CARD
-	return player.try_play_part(card, slot_index)
+	return player.try_play_part(card, slot_index, balance.scrap_return_fraction)
+
+
+func try_trash_part(player_number: int, slot_index: int) -> int:
+	if match_state != MatchState.ACTIVE:
+		return PlayerState.TrashPartResult.EMPTY_SLOT
+	var player := get_player(player_number)
+	if player == null:
+		return PlayerState.TrashPartResult.INVALID_SLOT
+	return player.try_trash_part(slot_index, balance.scrap_return_fraction)
 
 
 func apply_mech_damage(attacker: PlayerState, defender: PlayerState, amount: int) -> int:

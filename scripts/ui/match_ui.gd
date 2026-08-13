@@ -13,6 +13,7 @@ var p1_hand_container: HBoxContainer
 var p1_card_debug: Label
 var p1_selected_label: Label
 var p1_slot_buttons: Array[Button] = []
+var p1_trash_buttons: Array[Button] = []
 var p2_health: Label
 var p2_health_bar: ProgressBar
 var p2_damage: Label
@@ -21,6 +22,7 @@ var p2_hand_container: HBoxContainer
 var p2_card_debug: Label
 var p2_selected_label: Label
 var p2_slot_buttons: Array[Button] = []
+var p2_trash_buttons: Array[Button] = []
 var p1_hit_button: Button
 var p2_hit_button: Button
 var scrap_debug_buttons: Array[Button] = []
@@ -58,7 +60,7 @@ func _build_placeholder_ui() -> void:
 	var root := VBoxContainer.new()
 	root.add_theme_constant_override("separation", 5)
 	margin.add_child(root)
-	root.add_child(_label("MECH CARD GAME - PHASE 6 TEST MATCH", 20))
+	root.add_child(_label("MECH CARD GAME - PHASE 7 TEST MATCH", 20))
 	timer_label = _label("3:00", 28)
 	root.add_child(timer_label)
 	state_label = _label("", 16)
@@ -79,6 +81,7 @@ func _build_placeholder_ui() -> void:
 	p1_card_debug = p1_widgets[5]
 	p1_selected_label = p1_widgets[6]
 	p1_slot_buttons.assign(p1_widgets[7])
+	p1_trash_buttons.assign(p1_widgets[8])
 	var p2_widgets := _build_player_panel(players, 2)
 	p2_health = p2_widgets[0]
 	p2_health_bar = p2_widgets[1]
@@ -88,6 +91,7 @@ func _build_placeholder_ui() -> void:
 	p2_card_debug = p2_widgets[5]
 	p2_selected_label = p2_widgets[6]
 	p2_slot_buttons.assign(p2_widgets[7])
+	p2_trash_buttons.assign(p2_widgets[8])
 	_build_debug_panel(root)
 	feedback_label = _label("Select a card, then select one of that player's slots.", 16)
 	root.add_child(feedback_label)
@@ -115,6 +119,7 @@ func _build_player_panel(parent: Control, player_number: int) -> Array:
 	slots.columns = 2
 	box.add_child(slots)
 	var slot_buttons: Array[Button] = []
+	var trash_buttons: Array[Button] = []
 	for index in MechState.SLOT_COUNT:
 		var slot := Button.new()
 		slot.text = "Slot %d\nEMPTY" % (index + 1)
@@ -123,6 +128,17 @@ func _build_player_panel(parent: Control, player_number: int) -> Array:
 		slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		slots.add_child(slot)
 		slot_buttons.append(slot)
+	var trash_grid := GridContainer.new()
+	trash_grid.columns = 4
+	trash_grid.add_theme_constant_override("h_separation", 3)
+	box.add_child(trash_grid)
+	for index in MechState.SLOT_COUNT:
+		var trash_button := Button.new()
+		trash_button.text = "Trash S%d" % (index + 1)
+		trash_button.pressed.connect(_on_trash_pressed.bind(player_number, index))
+		trash_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		trash_grid.add_child(trash_button)
+		trash_buttons.append(trash_button)
 	var selected_label := _label("Selected card: None", 13)
 	box.add_child(selected_label)
 	box.add_child(_label("HAND - select a card to install", 13))
@@ -136,7 +152,7 @@ func _build_player_panel(parent: Control, player_number: int) -> Array:
 	hand_scroll.add_child(hand_container)
 	var card_debug := _label("Deck: 0 | Hand: 0", 12)
 	box.add_child(card_debug)
-	return [health_label, health_bar, damage_label, scrap_label, hand_container, card_debug, selected_label, slot_buttons]
+	return [health_label, health_bar, damage_label, scrap_label, hand_container, card_debug, selected_label, slot_buttons, trash_buttons]
 
 
 func _build_debug_panel(parent: Control) -> void:
@@ -256,15 +272,18 @@ func _on_slot_pressed(player_number: int, slot_index: int) -> void:
 	if card == null:
 		feedback_label.text = "Select a Player %d card first." % player_number
 		return
+	var old_part: MechPart = match_controller.get_player(player_number).mech.slots[slot_index]
+	var old_part_name := "" if old_part == null else old_part.card_data.display_name
 	var result := match_controller.try_play_card(player_number, card, slot_index)
 	match result:
 		PlayerState.PlayPartResult.SUCCESS:
 			feedback_label.text = "%s installed in Player %d Slot %d." % [card.display_name, player_number, slot_index + 1]
 			selected_cards[player_number] = null
-		PlayerState.PlayPartResult.SLOT_OCCUPIED:
-			feedback_label.text = "Slot occupied - Replace not implemented yet."
+		PlayerState.PlayPartResult.REPLACED:
+			feedback_label.text = "Replaced %s with %s." % [old_part_name, card.display_name]
+			selected_cards[player_number] = null
 		PlayerState.PlayPartResult.NOT_ENOUGH_SCRAP:
-			feedback_label.text = "Not enough Scrap."
+			feedback_label.text = "Not enough Scrap to install or replace this part."
 		PlayerState.PlayPartResult.INVALID_SLOT:
 			feedback_label.text = "Invalid mech slot."
 		PlayerState.PlayPartResult.NOT_A_PART:
@@ -272,6 +291,21 @@ func _on_slot_pressed(player_number: int, slot_index: int) -> void:
 		_:
 			feedback_label.text = "Card installation is not available."
 	_refresh()
+
+
+func _on_trash_pressed(player_number: int, slot_index: int) -> void:
+	var player := match_controller.get_player(player_number)
+	var part: MechPart = null if player == null or not player.mech.is_valid_slot(slot_index) else player.mech.slots[slot_index]
+	if part == null:
+		feedback_label.text = "No installed part to Trash."
+		return
+	var part_name := part.card_data.display_name
+	var scrap_return := player.calculate_scrap_return(part, match_controller.balance.scrap_return_fraction)
+	var result := match_controller.try_trash_part(player_number, slot_index)
+	if result == PlayerState.TrashPartResult.SUCCESS:
+		feedback_label.text = "Trashed %s for %.1f Scrap." % [part_name, scrap_return]
+	else:
+		feedback_label.text = "Part cannot be Trashed right now."
 
 
 func _refresh_cards() -> void:
@@ -297,16 +331,17 @@ func _refresh_player_cards(player: PlayerState, container: HBoxContainer, debug_
 
 
 func _refresh_slots() -> void:
-	_refresh_player_slots(match_controller.player_1, p1_slot_buttons)
-	_refresh_player_slots(match_controller.player_2, p2_slot_buttons)
+	_refresh_player_slots(match_controller.player_1, p1_slot_buttons, p1_trash_buttons)
+	_refresh_player_slots(match_controller.player_2, p2_slot_buttons, p2_trash_buttons)
 
 
-func _refresh_player_slots(player: PlayerState, buttons: Array[Button]) -> void:
+func _refresh_player_slots(player: PlayerState, buttons: Array[Button], trash_buttons: Array[Button]) -> void:
 	var active := match_controller.match_state == MatchController.MatchState.ACTIVE
 	for slot_index in MechState.SLOT_COUNT:
 		var part: MechPart = player.mech.slots[slot_index]
 		buttons[slot_index].text = "Slot %d\n%s" % [slot_index + 1, "EMPTY" if part == null else "%s\nHP: %d / %d" % [part.card_data.display_name, part.current_health, part.max_health]]
 		buttons[slot_index].disabled = not active
+		trash_buttons[slot_index].disabled = not active or part == null
 
 
 func _clear_invalid_selections() -> void:

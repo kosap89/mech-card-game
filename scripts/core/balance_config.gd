@@ -6,6 +6,9 @@ extends Resource
 @export_range(1, 100000, 1) var debug_damage_amount: int = 100
 @export_range(1, 100000, 1) var debug_part_damage_amount: int = 10
 
+# TODO(game design): Define the final Scrap return formula for Trash and Replace.
+@export_range(0.0, 1.0, 0.05) var scrap_return_fraction: float = 0.5
+
 # Temporary MVP Scrap values. These are subject to gameplay balancing.
 @export_range(0.0, 1000.0, 0.1) var starting_scrap: float = 0.0
 @export_range(0.0, 1000.0, 0.1) var scrap_per_second: float = 1.0

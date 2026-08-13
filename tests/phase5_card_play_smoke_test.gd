@@ -46,10 +46,10 @@ func _init() -> void:
 	initial_hand_size = player.hand.size()
 	scrap_before = player.current_scrap
 	result = controller.try_play_card(1, replacement_card, 2)
-	_check(result == PlayerState.PlayPartResult.SLOT_OCCUPIED, "Occupied slot rejects installation")
-	_check(player.mech.slots[2] == existing_part, "Occupied slot retains its existing part")
-	_check(player.hand.size() == initial_hand_size and player.hand.find(replacement_card) >= 0, "Rejected replacement leaves the card in hand")
-	_check(absf(player.current_scrap - scrap_before) < EPSILON, "Rejected replacement spends no Scrap")
+	_check(result == PlayerState.PlayPartResult.REPLACED, "Occupied slot uses Phase 7 Replace")
+	_check(player.mech.slots[2] != existing_part and player.mech.slots[2].card_data == replacement_card, "Replace installs a fresh part")
+	_check(player.hand.size() == initial_hand_size - 1 and player.hand.find(replacement_card) < 0, "Replace removes the selected card")
+	_check(player.current_scrap <= scrap_before + existing_part.card_data.cost * controller.balance.scrap_return_fraction, "Replace applies return and new cost")
 
 	var player_1_card: CardData = player.hand[0]
 	var player_2_hand_size := controller.player_2.hand.size()
