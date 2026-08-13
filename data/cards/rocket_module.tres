@@ -5,3 +5,4 @@ script = ExtResource("1")
 id = &"rocket_module"
 display_name = "Rocket Module"
 cost = 3.0
+max_health = 40

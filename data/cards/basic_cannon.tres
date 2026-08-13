@@ -4,4 +4,7 @@
 script = ExtResource("1")
 id = &"basic_cannon"
 display_name = "Basic Cannon"
-cost = 1.0
+cost = 2.0
+max_health = 40
+damage = 10
+activation_interval = 2.0

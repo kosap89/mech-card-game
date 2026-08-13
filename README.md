@@ -20,7 +20,7 @@ Many of these mechanics are planned and are not implemented yet.
 
 ## Current prototype status
 
-The current Phase 1–5 prototype includes:
+The current Phase 1–6 prototype includes:
 
 - A Godot project that launches successfully
 - A local match state
@@ -37,8 +37,10 @@ The current Phase 1–5 prototype includes:
 - Automatic card drawing during active matches
 - Card selection with enforced Scrap costs
 - Installation of part cards into empty generic mech slots
+- Runtime Health and destruction for installed parts
+- Basic Cannon automatic attacks against the opposing main mech
 
-Installed parts currently have no combat behavior. Replace, Trash, card effects, automatic combat, AI, and other later gameplay systems are not implemented.
+Basic Cannon has temporary automatic combat behavior. Manual targeting, normal attacks against enemy parts, Replace, Trash, most card effects, AI, and other later gameplay systems are not implemented.
 All current placeholder cards are temporarily treated as installable `PART` cards for MVP testing.
 
 ## Planned MVP systems

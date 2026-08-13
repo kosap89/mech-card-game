@@ -5,3 +5,4 @@ script = ExtResource("1")
 id = &"repair_module"
 display_name = "Repair Module"
 cost = 2.0
+max_health = 40

@@ -5,3 +5,4 @@ script = ExtResource("1")
 id = &"shield_emitter"
 display_name = "Shield Emitter"
 cost = 2.0
+max_health = 40

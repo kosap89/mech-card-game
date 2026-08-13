@@ -35,6 +35,9 @@ func _process(delta: float) -> void:
 	player_2.add_scrap(generated_scrap)
 	player_1.advance_card_draw(active_delta)
 	player_2.advance_card_draw(active_delta)
+	_update_player_combat(player_1, player_2, active_delta)
+	if match_state == MatchState.ACTIVE:
+		_update_player_combat(player_2, player_1, active_delta)
 	remaining_seconds = maxf(0.0, remaining_seconds - delta)
 	time_changed.emit(remaining_seconds)
 	if is_zero_approx(remaining_seconds):
@@ -88,6 +91,38 @@ func try_play_card(player_number: int, card: CardData, slot_index: int) -> int:
 	return player.try_play_part(card, slot_index)
 
 
+func apply_mech_damage(attacker: PlayerState, defender: PlayerState, amount: int) -> int:
+	if match_state != MatchState.ACTIVE or attacker == null or defender == null or attacker == defender:
+		return 0
+	var applied := defender.mech.apply_damage(amount)
+	attacker.record_mech_damage(applied)
+	if balance.end_match_when_mech_reaches_zero and defender.mech.current_health <= 0:
+		end_match()
+	return applied
+
+
+func _update_player_combat(attacker: PlayerState, defender: PlayerState, delta: float) -> void:
+	for slot_value in attacker.mech.slots:
+		var part: MechPart = slot_value
+		if part == null:
+			continue
+		var activation_count := part.advance_activation(delta)
+		for activation_index in activation_count:
+			if match_state != MatchState.ACTIVE:
+				return
+			apply_mech_damage(attacker, defender, part.card_data.damage)
+
+
+func damage_debug_part(player_number: int, slot_index: int, amount: int = -1) -> int:
+	if match_state != MatchState.ACTIVE:
+		return 0
+	var player := get_player(player_number)
+	if player == null:
+		return 0
+	var requested := balance.debug_part_damage_amount if amount < 0 else amount
+	return player.mech.damage_part(slot_index, requested)
+
+
 # Presentation calls this temporary test hook; it is not a gameplay action.
 func deal_debug_damage(attacking_player_number: int, amount: int = -1) -> int:
 	if match_state != MatchState.ACTIVE or attacking_player_number not in [1, 2]:
@@ -95,11 +130,8 @@ func deal_debug_damage(attacking_player_number: int, amount: int = -1) -> int:
 	var attacker := player_1 if attacking_player_number == 1 else player_2
 	var defender := player_2 if attacking_player_number == 1 else player_1
 	var requested := balance.debug_damage_amount if amount < 0 else amount
-	var applied := defender.mech.apply_damage(requested)
-	attacker.record_mech_damage(applied)
+	var applied := apply_mech_damage(attacker, defender, requested)
 	state_changed.emit()
-	if balance.end_match_when_mech_reaches_zero and defender.mech.current_health <= 0:
-		end_match()
 	return applied
 
 

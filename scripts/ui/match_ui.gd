@@ -24,6 +24,7 @@ var p2_slot_buttons: Array[Button] = []
 var p1_hit_button: Button
 var p2_hit_button: Button
 var scrap_debug_buttons: Array[Button] = []
+var part_debug_buttons: Array[Button] = []
 var feedback_label: Label
 var selected_cards: Dictionary = {1: null, 2: null}
 
@@ -38,6 +39,10 @@ func _ready() -> void:
 	match_controller.player_2.cards_changed.connect(_on_cards_changed)
 	match_controller.player_1.mech.slots_changed.connect(_on_slots_changed)
 	match_controller.player_2.mech.slots_changed.connect(_on_slots_changed)
+	match_controller.player_1.mech.health_changed.connect(_on_mech_health_changed)
+	match_controller.player_2.mech.health_changed.connect(_on_mech_health_changed)
+	match_controller.player_1.damage_total_changed.connect(_on_damage_total_changed)
+	match_controller.player_2.damage_total_changed.connect(_on_damage_total_changed)
 	match_controller.match_started.connect(_on_match_started)
 	_refresh()
 
@@ -45,25 +50,25 @@ func _ready() -> void:
 func _build_placeholder_ui() -> void:
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 24)
-	margin.add_theme_constant_override("margin_top", 16)
-	margin.add_theme_constant_override("margin_right", 24)
-	margin.add_theme_constant_override("margin_bottom", 16)
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_bottom", 8)
 	add_child(margin)
 	var root := VBoxContainer.new()
-	root.add_theme_constant_override("separation", 10)
+	root.add_theme_constant_override("separation", 5)
 	margin.add_child(root)
-	root.add_child(_label("MECH CARD GAME - PHASE 5 TEST MATCH", 24))
-	timer_label = _label("3:00", 36)
+	root.add_child(_label("MECH CARD GAME - PHASE 6 TEST MATCH", 20))
+	timer_label = _label("3:00", 28)
 	root.add_child(timer_label)
 	state_label = _label("", 16)
 	root.add_child(state_label)
-	result_label = _label("", 22)
-	result_label.custom_minimum_size.y = 30
+	result_label = _label("", 18)
+	result_label.custom_minimum_size.y = 22
 	root.add_child(result_label)
 	var players := HBoxContainer.new()
 	players.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	players.add_theme_constant_override("separation", 18)
+	players.add_theme_constant_override("separation", 10)
 	root.add_child(players)
 	var p1_widgets := _build_player_panel(players, 1)
 	p1_health = p1_widgets[0]
@@ -93,19 +98,19 @@ func _build_player_panel(parent: Control, player_number: int) -> Array:
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	parent.add_child(panel)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 8)
+	box.add_theme_constant_override("separation", 4)
 	panel.add_child(box)
-	box.add_child(_label("PLAYER %d MECH" % player_number, 22))
-	var health_label := _label("", 16)
+	box.add_child(_label("PLAYER %d MECH" % player_number, 18))
+	var health_label := _label("", 14)
 	box.add_child(health_label)
 	var health_bar := ProgressBar.new()
 	health_bar.show_percentage = false
 	box.add_child(health_bar)
-	var damage_label := _label("", 16)
+	var damage_label := _label("", 14)
 	box.add_child(damage_label)
-	var scrap_label := _label("SCRAP: 0.0", 20)
+	var scrap_label := _label("SCRAP: 0.0", 17)
 	box.add_child(scrap_label)
-	box.add_child(_label("Exactly 4 generic mech slots", 16))
+	box.add_child(_label("Exactly 4 generic mech slots", 14))
 	var slots := GridContainer.new()
 	slots.columns = 2
 	box.add_child(slots)
@@ -118,18 +123,18 @@ func _build_player_panel(parent: Control, player_number: int) -> Array:
 		slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		slots.add_child(slot)
 		slot_buttons.append(slot)
-	var selected_label := _label("Selected card: None", 15)
+	var selected_label := _label("Selected card: None", 13)
 	box.add_child(selected_label)
-	box.add_child(_label("HAND - select a card to install", 15))
+	box.add_child(_label("HAND - select a card to install", 13))
 	var hand_scroll := ScrollContainer.new()
-	hand_scroll.custom_minimum_size.y = 70
+	hand_scroll.custom_minimum_size.y = 62
 	hand_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	hand_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	box.add_child(hand_scroll)
 	var hand_container := HBoxContainer.new()
 	hand_container.add_theme_constant_override("separation", 6)
 	hand_scroll.add_child(hand_container)
-	var card_debug := _label("Deck: 0 | Hand: 0", 14)
+	var card_debug := _label("Deck: 0 | Hand: 0", 12)
 	box.add_child(card_debug)
 	return [health_label, health_bar, damage_label, scrap_label, hand_container, card_debug, selected_label, slot_buttons]
 
@@ -139,9 +144,11 @@ func _build_debug_panel(parent: Control) -> void:
 	parent.add_child(panel)
 	var box := VBoxContainer.new()
 	panel.add_child(box)
-	box.add_child(_label("DEVELOPMENT DEBUG CONTROLS - not game mechanics", 16))
-	var buttons := HBoxContainer.new()
-	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_child(_label("DEVELOPMENT DEBUG CONTROLS - not game mechanics", 14))
+	var buttons := GridContainer.new()
+	buttons.columns = 4
+	buttons.add_theme_constant_override("h_separation", 4)
+	buttons.add_theme_constant_override("v_separation", 4)
 	box.add_child(buttons)
 	p1_hit_button = Button.new()
 	p1_hit_button.text = "P1 hits P2 (-%d)" % match_controller.balance.debug_damage_amount
@@ -162,6 +169,11 @@ func _build_debug_panel(parent: Control) -> void:
 		spend_scrap_button.pressed.connect(_on_spend_scrap_pressed.bind(player_number))
 		buttons.add_child(spend_scrap_button)
 		scrap_debug_buttons.append(spend_scrap_button)
+		var damage_part_button := Button.new()
+		damage_part_button.text = "P%d Slot 1 -%d HP" % [player_number, match_controller.balance.debug_part_damage_amount]
+		damage_part_button.pressed.connect(_on_damage_part_pressed.bind(player_number))
+		buttons.add_child(damage_part_button)
+		part_debug_buttons.append(damage_part_button)
 	var restart := Button.new()
 	restart.text = "Restart / Play Again"
 	restart.pressed.connect(match_controller.restart_match)
@@ -197,6 +209,10 @@ func _on_spend_scrap_pressed(player_number: int) -> void:
 	match_controller.spend_debug_scrap(player_number)
 
 
+func _on_damage_part_pressed(player_number: int) -> void:
+	match_controller.damage_debug_part(player_number, 0)
+
+
 func _on_scrap_changed(_current_scrap: float) -> void:
 	_refresh_scrap()
 
@@ -208,6 +224,14 @@ func _on_cards_changed(_deck_count: int, _hand_count: int) -> void:
 
 func _on_slots_changed() -> void:
 	_refresh_slots()
+
+
+func _on_mech_health_changed(_current_health: int, _max_health: int) -> void:
+	_refresh_mech_combat_state()
+
+
+func _on_damage_total_changed(_total: int) -> void:
+	_refresh_mech_combat_state()
 
 
 func _on_match_started() -> void:
@@ -281,7 +305,7 @@ func _refresh_player_slots(player: PlayerState, buttons: Array[Button]) -> void:
 	var active := match_controller.match_state == MatchController.MatchState.ACTIVE
 	for slot_index in MechState.SLOT_COUNT:
 		var part: MechPart = player.mech.slots[slot_index]
-		buttons[slot_index].text = "Slot %d\n%s" % [slot_index + 1, "EMPTY" if part == null else part.card_data.display_name]
+		buttons[slot_index].text = "Slot %d\n%s" % [slot_index + 1, "EMPTY" if part == null else "%s\nHP: %d / %d" % [part.card_data.display_name, part.current_health, part.max_health]]
 		buttons[slot_index].disabled = not active
 
 
@@ -298,22 +322,28 @@ func _refresh_scrap() -> void:
 	p2_scrap.text = "SCRAP: %.1f" % match_controller.player_2.current_scrap
 
 
-func _refresh() -> void:
-	state_label.text = "State: %s" % match_controller.get_state_name()
-	result_label.text = match_controller.result_text
+func _refresh_mech_combat_state() -> void:
 	p1_health.text = "Health: %d / %d" % [match_controller.player_1.mech.current_health, match_controller.player_1.mech.max_health]
 	p1_health_bar.max_value = match_controller.player_1.mech.max_health
 	p1_health_bar.value = match_controller.player_1.mech.current_health
 	p1_damage.text = "Total mech damage dealt: %d" % match_controller.player_1.total_mech_damage_dealt
-	_refresh_scrap()
 	p2_health.text = "Health: %d / %d" % [match_controller.player_2.mech.current_health, match_controller.player_2.mech.max_health]
 	p2_health_bar.max_value = match_controller.player_2.mech.max_health
 	p2_health_bar.value = match_controller.player_2.mech.current_health
 	p2_damage.text = "Total mech damage dealt: %d" % match_controller.player_2.total_mech_damage_dealt
+
+
+func _refresh() -> void:
+	state_label.text = "State: %s" % match_controller.get_state_name()
+	result_label.text = match_controller.result_text
+	_refresh_mech_combat_state()
+	_refresh_scrap()
 	var active := match_controller.match_state == MatchController.MatchState.ACTIVE
 	p1_hit_button.disabled = not active
 	p2_hit_button.disabled = not active
 	for button in scrap_debug_buttons:
+		button.disabled = not active
+	for button in part_debug_buttons:
 		button.disabled = not active
 	_refresh_cards()
 	_refresh_slots()

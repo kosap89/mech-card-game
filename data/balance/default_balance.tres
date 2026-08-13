@@ -7,6 +7,7 @@ script = ExtResource("1")
 match_duration_seconds = 180.0
 mech_max_health = 1000
 debug_damage_amount = 100
+debug_part_damage_amount = 10
 starting_scrap = 0.0
 scrap_per_second = 1.0
 debug_scrap_amount = 1.0

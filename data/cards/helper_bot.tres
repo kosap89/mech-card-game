@@ -5,3 +5,4 @@ script = ExtResource("1")
 id = &"helper_bot"
 display_name = "Helper Bot"
 cost = 1.0
+max_health = 40

@@ -2,7 +2,9 @@
 [ext_resource type="Script" path="res://scripts/cards/card_data.gd" id="1"]
 [resource]
 script = ExtResource("1")
-id = &"heavy_cannon"
-display_name = "Heavy Cannon"
-cost = 3.0
+id = &"basic_cannon_test_copy_3"
+display_name = "Basic Cannon"
+cost = 2.0
 max_health = 40
+damage = 10
+activation_interval = 2.0
