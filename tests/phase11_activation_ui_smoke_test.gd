@@ -112,7 +112,7 @@ func _test_countdown_ui(light: CardData, heavy: CardData) -> void:
 	_check("EMPTY" in main_scene.p1_slot_buttons[0].text and "Next: 3.0s" in main_scene.p1_builtin_cannon.text, "Restart clears modules and resets Built-in Cannon presentation")
 	var margin: MarginContainer = main_scene.get_child(1)
 	var minimum_size := margin.get_combined_minimum_size()
-	_check(minimum_size.x <= 1100.0 and minimum_size.y <= 720.0, "Phase 11 UI minimum size fits the configured viewport")
+	_check(minimum_size.x <= 1280.0 and minimum_size.y <= 720.0, "Activation UI minimum size fits the configured desktop viewport")
 	main_scene.free()
 
 

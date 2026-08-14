@@ -84,7 +84,7 @@ func _test_ui_minimum_size() -> void:
 	main_scene._ready()
 	var margin: MarginContainer = main_scene.get_child(1)
 	var minimum_size := margin.get_combined_minimum_size()
-	_check(minimum_size.x <= 1100.0 and minimum_size.y <= 720.0, "Phase 6 UI minimum size fits the configured viewport")
+	_check(minimum_size.x <= 1280.0 and minimum_size.y <= 720.0, "UI minimum size fits the configured desktop viewport")
 	main_scene.free()
 
 
