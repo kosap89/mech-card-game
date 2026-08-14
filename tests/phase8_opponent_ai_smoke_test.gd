@@ -30,16 +30,16 @@ func _init() -> void:
 	controller.restart_match()
 	ai.random.seed = 808
 	player = controller.player_2
-	player.current_scrap = 0.0
+	player.current_scrap = 0
 	hand_before = player.hand.size()
 	ai.advance(controller.balance.ai_decision_interval_seconds)
 	_check(player.hand.size() == hand_before and _occupied_slot_count(player.mech) == 0, "AI does not play an unaffordable card")
-	_check(player.current_scrap >= 0.0, "AI Scrap never becomes negative")
+	_check(player.current_scrap >= 0, "AI Scrap never becomes negative")
 
 	controller.restart_match()
 	ai.random.seed = 808
 	player = controller.player_2
-	player.current_scrap = 100.0
+	player.current_scrap = 100
 	while player.hand.size() < MechState.SLOT_COUNT + 1 and not player.deck.is_empty():
 		player.draw_card()
 	for decision_index in MechState.SLOT_COUNT:
@@ -64,7 +64,7 @@ func _init() -> void:
 	controller.restart_match()
 	_check(is_zero_approx(ai.decision_elapsed_seconds), "Restart resets AI decision timing")
 	_check(_occupied_slot_count(controller.player_2.mech) == 0, "Restart clears the AI mech")
-	controller.player_2.current_scrap = 100.0
+	controller.player_2.current_scrap = 100
 	hand_before = controller.player_2.hand.size()
 	ai.advance(controller.balance.ai_decision_interval_seconds)
 	_check(controller.player_2.hand.size() == hand_before - 1, "AI resumes normal decisions after restart")

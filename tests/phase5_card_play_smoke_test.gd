@@ -11,6 +11,7 @@ func _init() -> void:
 	_test_ui_interaction_path()
 	var controller: MatchController = MatchControllerScript.new()
 	controller.balance = load("res://data/balance/default_balance.tres")
+	controller.balance.builtin_cannon_activation_interval_seconds = 10000.0
 	controller.test_deck = load("res://data/cards/test_deck.tres")
 	controller._ready()
 	controller.opponent_ai.enabled = false
@@ -18,7 +19,7 @@ func _init() -> void:
 	var player := controller.player_1
 	var first_card: CardData = player.hand[0]
 	var initial_hand_size := player.hand.size()
-	player.add_scrap(10.0)
+	player.add_scrap(10)
 	var scrap_before := player.current_scrap
 	var result := controller.try_play_card(1, first_card, 0)
 	_check(result == PlayerState.PlayPartResult.SUCCESS, "Affordable part installs successfully")
@@ -39,7 +40,7 @@ func _init() -> void:
 	_check(player.hand.size() == initial_hand_size and player.hand.find(unaffordable_card) >= 0, "Unaffordable card remains in hand")
 	_check(player.mech.slots[1] == null, "Unaffordable installation leaves the slot empty")
 
-	player.add_scrap(10.0)
+	player.add_scrap(10)
 	var occupied_card: CardData = player.hand[0]
 	_check(controller.try_play_card(1, occupied_card, 2) == PlayerState.PlayPartResult.SUCCESS, "Test setup installs into an empty slot")
 	var existing_part: MechPart = player.mech.slots[2]
@@ -70,7 +71,7 @@ func _init() -> void:
 	_check(controller.player_1.hand.size() == controller.balance.starting_hand_size, "Restart deals a fresh starting hand")
 	_check(controller.player_1.current_scrap == controller.balance.starting_scrap, "Restart resets Scrap")
 	_check(_all_slots_empty(controller.player_1.mech) and _all_slots_empty(controller.player_2.mech), "Restart empties all mech slots")
-	controller.player_1.add_scrap(10.0)
+	controller.player_1.add_scrap(10)
 	_check(controller.try_play_card(1, controller.player_1.hand[0], 0) == PlayerState.PlayPartResult.SUCCESS, "Card play is enabled again after restart")
 
 	controller.restart_match()
@@ -79,8 +80,8 @@ func _init() -> void:
 	_check(controller.player_1.current_scrap > controller.balance.starting_scrap, "Existing Scrap generation still works")
 	controller.deal_debug_damage(1)
 	_check(controller.player_2.mech.current_health == controller.balance.mech_max_health - controller.balance.debug_damage_amount, "Existing health and damage still work")
-	controller._process(controller.balance.match_duration_seconds)
-	_check(controller.match_state == MatchController.MatchState.ENDED and controller.result_text == "Player 1 wins!", "Existing timer and winner calculation still work")
+	controller.deal_debug_damage(1, controller.player_2.mech.current_health)
+	_check(controller.match_state == MatchController.MatchState.ENDED and controller.result_text == "Player 1 wins!", "Zero Health and winner calculation work")
 	controller.free()
 
 	if failures.is_empty():
@@ -101,7 +102,7 @@ func _test_ui_interaction_path() -> void:
 	main_scene._ready()
 	var original_button: Button = main_scene.p1_hand_container.get_child(0)
 	var selected_card: CardData = controller.player_1.hand[0]
-	controller.player_1.add_scrap(10.0)
+	controller.player_1.add_scrap(10)
 	_check(is_instance_valid(original_button) and original_button.get_parent() == main_scene.p1_hand_container, "Scrap updates do not rebuild hand controls during a click")
 	original_button.pressed.emit()
 	_check(main_scene.selected_cards[1] == selected_card, "Hand Button signal stores the selected CardData reference")

@@ -2,7 +2,6 @@ class_name MatchController
 extends Node
 
 signal match_started
-signal time_changed(remaining_seconds: float)
 signal match_ended(result_text: String)
 signal state_changed
 signal ai_card_played(card_name: String, slot_index: int, replaced: bool, old_part_name: String)
@@ -14,7 +13,6 @@ enum MatchState { READY, ACTIVE, ENDED }
 
 var player_1: PlayerState
 var player_2: PlayerState
-var remaining_seconds: float = 0.0
 var match_state: int = MatchState.READY
 var result_text := ""
 var opponent_ai: SimpleOpponentAI
@@ -33,32 +31,29 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if match_state != MatchState.ACTIVE:
 		return
-	var active_delta := minf(delta, remaining_seconds)
-	var generated_scrap := balance.scrap_per_second * active_delta
-	player_1.add_scrap(generated_scrap)
-	player_2.add_scrap(generated_scrap)
-	player_1.advance_card_draw(active_delta)
-	player_2.advance_card_draw(active_delta)
-	_update_player_combat(player_1, player_2, active_delta)
+	_update_builtin_cannon(player_1, player_2, delta)
 	if match_state == MatchState.ACTIVE:
-		_update_player_combat(player_2, player_1, active_delta)
+		_update_builtin_cannon(player_2, player_1, delta)
 	if match_state == MatchState.ACTIVE:
-		opponent_ai.advance(active_delta)
-	remaining_seconds = maxf(0.0, remaining_seconds - delta)
-	time_changed.emit(remaining_seconds)
-	if is_zero_approx(remaining_seconds):
-		end_match()
+		_update_player_combat(player_1, player_2, delta)
+	if match_state == MatchState.ACTIVE:
+		_update_player_combat(player_2, player_1, delta)
+	if match_state != MatchState.ACTIVE:
+		return
+	player_1.advance_scrap_generation(delta, balance.scrap_gain_amount, balance.scrap_gain_interval_seconds)
+	player_2.advance_scrap_generation(delta, balance.scrap_gain_amount, balance.scrap_gain_interval_seconds)
+	player_1.advance_card_draw(delta)
+	player_2.advance_card_draw(delta)
+	opponent_ai.advance(delta)
 
 
 func start_match() -> void:
 	player_1.reset(balance.starting_hand_size)
 	player_2.reset(balance.starting_hand_size)
-	remaining_seconds = balance.match_duration_seconds
 	result_text = ""
 	match_state = MatchState.ACTIVE
 	opponent_ai.reset()
 	match_started.emit()
-	time_changed.emit(remaining_seconds)
 	state_changed.emit()
 
 
@@ -112,9 +107,17 @@ func apply_mech_damage(attacker: PlayerState, defender: PlayerState, amount: int
 		return 0
 	var applied := defender.mech.apply_damage(amount)
 	attacker.record_mech_damage(applied)
-	if balance.end_match_when_mech_reaches_zero and defender.mech.current_health <= 0:
-		end_match()
+	if defender.mech.current_health <= 0:
+		end_match(attacker.player_number)
 	return applied
+
+
+func _update_builtin_cannon(attacker: PlayerState, defender: PlayerState, delta: float) -> void:
+	var activation_count := attacker.mech.advance_builtin_cannon(delta, balance.builtin_cannon_activation_interval_seconds)
+	for activation_index in activation_count:
+		if match_state != MatchState.ACTIVE:
+			return
+		apply_mech_damage(attacker, defender, balance.builtin_cannon_damage)
 
 
 func _update_player_combat(attacker: PlayerState, defender: PlayerState, delta: float) -> void:
@@ -151,18 +154,16 @@ func deal_debug_damage(attacking_player_number: int, amount: int = -1) -> int:
 	return applied
 
 
-func end_match() -> void:
+func end_match(winning_player_number: int = 0) -> void:
 	if match_state != MatchState.ACTIVE:
 		return
-	remaining_seconds = 0.0
 	match_state = MatchState.ENDED
-	if player_1.total_mech_damage_dealt > player_2.total_mech_damage_dealt:
+	if winning_player_number == 1:
 		result_text = "Player 1 wins!"
-	elif player_2.total_mech_damage_dealt > player_1.total_mech_damage_dealt:
+	elif winning_player_number == 2:
 		result_text = "Player 2 wins!"
 	else:
-		result_text = "Draw!"
-	time_changed.emit(remaining_seconds)
+		result_text = "Match ended."
 	match_ended.emit(result_text)
 	state_changed.emit()
 

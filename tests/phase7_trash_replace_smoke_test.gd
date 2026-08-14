@@ -19,7 +19,7 @@ func _init() -> void:
 	var deck_before := player.deck.size()
 	var mech_health_before := player.mech.current_health
 	var scrap_before := player.current_scrap
-	var expected_return := cannon.cost * controller.balance.scrap_return_fraction
+	var expected_return := ceili(cannon.cost * controller.balance.scrap_return_fraction)
 	_check(controller.try_trash_part(1, 0) == PlayerState.TrashPartResult.SUCCESS, "Installed part can be Trashed")
 	_check(player.mech.slots[0] == null, "Trash empties the slot")
 	_check(absf(player.current_scrap - (scrap_before + expected_return)) < EPSILON, "Trash returns configured Scrap fraction")
@@ -39,7 +39,7 @@ func _init() -> void:
 	controller.restart_match()
 	player = controller.player_1
 	var old_part := _install_test_part(player, armor, 0)
-	player.current_scrap = 1.0
+	player.current_scrap = 1
 	player.hand.append(cannon)
 	var hand_size := player.hand.size()
 	var cannon_copies_before := player.hand.count(cannon)
@@ -53,7 +53,7 @@ func _init() -> void:
 	controller.restart_match()
 	player = controller.player_1
 	old_part = _install_test_part(player, armor, 0)
-	player.current_scrap = 0.0
+	player.current_scrap = 0
 	var expensive_card: CardData = load("res://data/cards/heavy_cannon.tres")
 	player.hand.append(expensive_card)
 	hand_size = player.hand.size()
@@ -95,6 +95,7 @@ func _init() -> void:
 func _new_controller() -> MatchController:
 	var controller: MatchController = MatchControllerScript.new()
 	controller.balance = load("res://data/balance/default_balance.tres")
+	controller.balance.builtin_cannon_activation_interval_seconds = 10000.0
 	controller.test_deck = load("res://data/cards/test_deck.tres")
 	controller._ready()
 	controller.opponent_ai.enabled = false

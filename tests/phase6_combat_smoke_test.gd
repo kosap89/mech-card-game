@@ -77,6 +77,7 @@ func _init() -> void:
 func _test_ui_minimum_size() -> void:
 	var main_scene: Control = load("res://scenes/main/main.tscn").instantiate()
 	var controller: MatchController = main_scene.get_node("MatchController")
+	controller.balance.builtin_cannon_activation_interval_seconds = 10000.0
 	controller._ready()
 	controller.opponent_ai.enabled = false
 	main_scene.match_controller = controller
@@ -90,6 +91,7 @@ func _test_ui_minimum_size() -> void:
 func _new_controller() -> MatchController:
 	var controller: MatchController = MatchControllerScript.new()
 	controller.balance = load("res://data/balance/default_balance.tres")
+	controller.balance.builtin_cannon_activation_interval_seconds = 10000.0
 	controller.test_deck = load("res://data/cards/test_deck.tres")
 	controller._ready()
 	controller.opponent_ai.enabled = false

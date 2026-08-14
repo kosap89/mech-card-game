@@ -4,5 +4,5 @@
 script = ExtResource("1")
 id = &"scrap_collector"
 display_name = "Scrap Collector"
-cost = 1.0
+cost = 1
 max_health = 40

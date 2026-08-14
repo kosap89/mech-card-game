@@ -9,6 +9,7 @@ func _init() -> void:
 	seed(12345)
 	var controller: MatchController = MatchControllerScript.new()
 	controller.balance = load("res://data/balance/default_balance.tres")
+	controller.balance.builtin_cannon_activation_interval_seconds = 10000.0
 	controller.test_deck = load("res://data/cards/test_deck.tres")
 	controller._ready()
 	controller.opponent_ai.enabled = false
@@ -54,9 +55,9 @@ func _init() -> void:
 	controller.restart_match()
 	controller.deal_debug_damage(1)
 	_check(controller.player_2.mech.current_health == controller.balance.mech_max_health - controller.balance.debug_damage_amount, "Existing health and damage still work")
-	controller._process(controller.balance.match_duration_seconds)
-	_check(controller.match_state == MatchController.MatchState.ENDED, "Existing timer still ends the match")
-	_check(controller.result_text == "Player 1 wins!", "Existing winner calculation still works")
+	controller.deal_debug_damage(1, controller.player_2.mech.current_health)
+	_check(controller.match_state == MatchController.MatchState.ENDED, "Zero mech Health ends the match")
+	_check(controller.result_text == "Player 1 wins!", "Existing winner feedback still works")
 	controller.free()
 
 	if failures.is_empty():
@@ -70,7 +71,7 @@ func _init() -> void:
 
 func _all_cards_valid(cards: Array[CardData]) -> bool:
 	for card in cards:
-		if card == null or card.id.is_empty() or card.display_name.is_empty() or card.cost < 0.0:
+		if card == null or card.id.is_empty() or card.display_name.is_empty() or card.cost < 0:
 			return false
 	return true
 

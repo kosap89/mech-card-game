@@ -4,5 +4,5 @@
 script = ExtResource("1")
 id = &"armor_plate"
 display_name = "Armor Plate"
-cost = 2.0
+cost = 2
 max_health = 40

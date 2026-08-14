@@ -2,7 +2,6 @@ extends Control
 
 @onready var match_controller: MatchController = $MatchController
 
-var timer_label: Label
 var state_label: Label
 var result_label: Label
 var p1_health: Label
@@ -33,7 +32,6 @@ var selected_cards: Dictionary = {1: null, 2: null}
 
 func _ready() -> void:
 	_build_placeholder_ui()
-	match_controller.time_changed.connect(_update_timer)
 	match_controller.state_changed.connect(_refresh)
 	match_controller.player_1.scrap_changed.connect(_on_scrap_changed)
 	match_controller.player_2.scrap_changed.connect(_on_scrap_changed)
@@ -61,9 +59,7 @@ func _build_placeholder_ui() -> void:
 	var root := VBoxContainer.new()
 	root.add_theme_constant_override("separation", 5)
 	margin.add_child(root)
-	root.add_child(_label("MECH CARD GAME - PHASE 8 TEST MATCH", 20))
-	timer_label = _label("3:00", 28)
-	root.add_child(timer_label)
+	root.add_child(_label("MECH CARD GAME - PHASE 9 TEST MATCH", 20))
 	state_label = _label("", 16)
 	root.add_child(state_label)
 	result_label = _label("", 18)
@@ -113,8 +109,10 @@ func _build_player_panel(parent: Control, player_number: int) -> Array:
 	box.add_child(health_bar)
 	var damage_label := _label("", 14)
 	box.add_child(damage_label)
-	var scrap_label := _label("SCRAP: 0.0", 17)
+	var scrap_label := _label("SCRAP: 0", 17)
 	box.add_child(scrap_label)
+	var cannon_interval_text := ("%.1f" % match_controller.balance.builtin_cannon_activation_interval_seconds).trim_suffix(".0")
+	box.add_child(_label("Built-in Cannon: %d DMG / %ss" % [match_controller.balance.builtin_cannon_damage, cannon_interval_text], 13))
 	box.add_child(_label("Exactly 4 generic mech slots", 14))
 	var slots := GridContainer.new()
 	slots.columns = 2
@@ -177,12 +175,12 @@ func _build_debug_panel(parent: Control) -> void:
 	buttons.add_child(p2_hit_button)
 	for player_number in [1, 2]:
 		var add_scrap_button := Button.new()
-		add_scrap_button.text = "P%d +%.1f Scrap" % [player_number, match_controller.balance.debug_scrap_amount]
+		add_scrap_button.text = "P%d +%d Scrap" % [player_number, match_controller.balance.debug_scrap_amount]
 		add_scrap_button.pressed.connect(_on_add_scrap_pressed.bind(player_number))
 		buttons.add_child(add_scrap_button)
 		scrap_debug_buttons.append(add_scrap_button)
 		var spend_scrap_button := Button.new()
-		spend_scrap_button.text = "P%d Spend %.1f Scrap" % [player_number, match_controller.balance.debug_scrap_amount]
+		spend_scrap_button.text = "P%d Spend %d Scrap" % [player_number, match_controller.balance.debug_scrap_amount]
 		spend_scrap_button.pressed.connect(_on_spend_scrap_pressed.bind(player_number))
 		buttons.add_child(spend_scrap_button)
 		scrap_debug_buttons.append(spend_scrap_button)
@@ -205,11 +203,6 @@ func _label(text_value: String, font_size: int) -> Label:
 	return label
 
 
-func _update_timer(seconds: float) -> void:
-	var whole := ceili(seconds)
-	timer_label.text = "%d:%02d" % [whole / 60, whole % 60]
-
-
 func _on_p1_hit_pressed() -> void:
 	match_controller.deal_debug_damage(1)
 
@@ -230,7 +223,7 @@ func _on_damage_part_pressed(player_number: int) -> void:
 	match_controller.damage_debug_part(player_number, 0)
 
 
-func _on_scrap_changed(_current_scrap: float) -> void:
+func _on_scrap_changed(_current_scrap: int) -> void:
 	_refresh_scrap()
 
 
@@ -310,10 +303,10 @@ func _on_trash_pressed(player_number: int, slot_index: int) -> void:
 		feedback_label.text = "No installed part to Trash."
 		return
 	var part_name := part.card_data.display_name
-	var scrap_return := player.calculate_scrap_return(part, match_controller.balance.scrap_return_fraction)
+	var scrap_return: int = player.calculate_scrap_return(part, match_controller.balance.scrap_return_fraction)
 	var result := match_controller.try_trash_part(player_number, slot_index)
 	if result == PlayerState.TrashPartResult.SUCCESS:
-		feedback_label.text = "Trashed %s for %.1f Scrap." % [part_name, scrap_return]
+		feedback_label.text = "Trashed %s for %d Scrap." % [part_name, scrap_return]
 	else:
 		feedback_label.text = "Part cannot be Trashed right now."
 
@@ -371,8 +364,8 @@ func _clear_invalid_selections() -> void:
 
 
 func _refresh_scrap() -> void:
-	p1_scrap.text = "SCRAP: %.1f" % match_controller.player_1.current_scrap
-	p2_scrap.text = "SCRAP: %.1f" % match_controller.player_2.current_scrap
+	p1_scrap.text = "SCRAP: %d" % match_controller.player_1.current_scrap
+	p2_scrap.text = "SCRAP: %d" % match_controller.player_2.current_scrap
 
 
 func _refresh_mech_combat_state() -> void:

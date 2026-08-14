@@ -9,6 +9,7 @@ const SLOT_COUNT := 4
 var max_health: int
 var current_health: int
 var slots: Array = []
+var builtin_cannon_elapsed: float = 0.0
 
 
 func _init(configured_max_health: int) -> void:
@@ -33,6 +34,17 @@ func is_valid_slot(slot_index: int) -> bool:
 
 func is_slot_empty(slot_index: int) -> bool:
 	return is_valid_slot(slot_index) and slots[slot_index] == null
+
+
+func advance_builtin_cannon(delta: float, activation_interval: float) -> int:
+	if activation_interval <= 0.0:
+		return 0
+	builtin_cannon_elapsed += maxf(0.0, delta)
+	var activation_count := 0
+	while builtin_cannon_elapsed >= activation_interval:
+		builtin_cannon_elapsed -= activation_interval
+		activation_count += 1
+	return activation_count
 
 
 func install_part(part: MechPart, slot_index: int) -> bool:
@@ -78,6 +90,7 @@ func _on_part_destroyed(part: MechPart) -> void:
 
 func reset() -> void:
 	current_health = max_health
+	builtin_cannon_elapsed = 0.0
 	slots.fill(null)
 	health_changed.emit(current_health, max_health)
 	slots_changed.emit()

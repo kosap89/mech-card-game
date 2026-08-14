@@ -14,14 +14,15 @@ enum PlayPartResult {
 enum TrashPartResult { SUCCESS, INVALID_SLOT, EMPTY_SLOT }
 
 signal damage_total_changed(total: int)
-signal scrap_changed(current_scrap: float)
+signal scrap_changed(current_scrap: int)
 signal cards_changed(deck_count: int, hand_count: int)
 
 var player_number: int
 var mech: MechState
 var total_mech_damage_dealt: int = 0
-var current_scrap: float = 0.0
-var starting_scrap: float = 0.0
+var current_scrap: int = 0
+var starting_scrap: int = 0
+var scrap_generation_elapsed: float = 0.0
 var deck_definition: CardDeckDefinition
 var deck: Array[CardData] = []
 var hand: Array[CardData] = []
@@ -29,10 +30,10 @@ var draw_interval_seconds: float = 3.0
 var draw_elapsed_seconds: float = 0.0
 
 
-func _init(number: int, mech_max_health: int, configured_starting_scrap: float, configured_deck: CardDeckDefinition, configured_draw_interval: float) -> void:
+func _init(number: int, mech_max_health: int, configured_starting_scrap: int, configured_deck: CardDeckDefinition, configured_draw_interval: float) -> void:
 	player_number = number
 	mech = MechState.new(mech_max_health)
-	starting_scrap = maxf(0.0, configured_starting_scrap)
+	starting_scrap = maxi(0, configured_starting_scrap)
 	current_scrap = starting_scrap
 	deck_definition = configured_deck
 	draw_interval_seconds = maxf(0.1, configured_draw_interval)
@@ -44,21 +45,21 @@ func record_mech_damage(amount: int) -> void:
 		damage_total_changed.emit(total_mech_damage_dealt)
 
 
-func add_scrap(amount: float) -> void:
-	if amount <= 0.0:
+func add_scrap(amount: int) -> void:
+	if amount <= 0:
 		return
 	current_scrap += amount
 	scrap_changed.emit(current_scrap)
 
 
-func can_afford(amount: float) -> bool:
-	return amount >= 0.0 and current_scrap >= amount
+func can_afford(amount: int) -> bool:
+	return amount >= 0 and current_scrap >= amount
 
 
-func spend_scrap(amount: float) -> bool:
-	if amount <= 0.0 or not can_afford(amount):
+func spend_scrap(amount: int) -> bool:
+	if amount <= 0 or not can_afford(amount):
 		return false
-	current_scrap = maxf(0.0, current_scrap - amount)
+	current_scrap = maxi(0, current_scrap - amount)
 	scrap_changed.emit(current_scrap)
 	return true
 
@@ -98,7 +99,7 @@ func try_play_part(card: CardData, slot_index: int, scrap_return_fraction: float
 	if validation_result not in [PlayPartResult.SUCCESS, PlayPartResult.REPLACED]:
 		return validation_result
 	var old_part: MechPart = mech.slots[slot_index]
-	var scrap_return := 0.0 if old_part == null else calculate_scrap_return(old_part, scrap_return_fraction)
+	var scrap_return := 0 if old_part == null else calculate_scrap_return(old_part, scrap_return_fraction)
 	if old_part != null:
 		mech.take_part(slot_index)
 		add_scrap(scrap_return)
@@ -117,16 +118,17 @@ func validate_play_part(card: CardData, slot_index: int, scrap_return_fraction: 
 	if not mech.is_valid_slot(slot_index):
 		return PlayPartResult.INVALID_SLOT
 	var old_part: MechPart = mech.slots[slot_index]
-	var scrap_return := 0.0 if old_part == null else calculate_scrap_return(old_part, scrap_return_fraction)
+	var scrap_return := 0 if old_part == null else calculate_scrap_return(old_part, scrap_return_fraction)
 	if current_scrap + scrap_return < card.cost:
 		return PlayPartResult.NOT_ENOUGH_SCRAP
 	return PlayPartResult.SUCCESS if old_part == null else PlayPartResult.REPLACED
 
 
-func calculate_scrap_return(part: MechPart, scrap_return_fraction: float) -> float:
+func calculate_scrap_return(part: MechPart, scrap_return_fraction: float) -> int:
 	if part == null:
-		return 0.0
-	return part.card_data.cost * clampf(scrap_return_fraction, 0.0, 1.0)
+		return 0
+	# TODO(game design): The 50% return and upward rounding are temporary MVP rules.
+	return ceili(part.card_data.cost * clampf(scrap_return_fraction, 0.0, 1.0))
 
 
 func try_trash_part(slot_index: int, scrap_return_fraction: float) -> int:
@@ -150,9 +152,19 @@ func advance_card_draw(delta: float) -> void:
 		draw_card()
 
 
+func advance_scrap_generation(delta: float, gain_amount: int, gain_interval_seconds: float) -> void:
+	if gain_amount <= 0 or gain_interval_seconds <= 0.0:
+		return
+	scrap_generation_elapsed += maxf(0.0, delta)
+	while scrap_generation_elapsed >= gain_interval_seconds:
+		scrap_generation_elapsed -= gain_interval_seconds
+		add_scrap(gain_amount)
+
+
 func reset(starting_hand_size: int = 0) -> void:
 	total_mech_damage_dealt = 0
 	current_scrap = starting_scrap
+	scrap_generation_elapsed = 0.0
 	hand.clear()
 	draw_elapsed_seconds = 0.0
 	initialize_deck()
