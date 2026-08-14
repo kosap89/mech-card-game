@@ -84,6 +84,13 @@ func get_player(player_number: int) -> PlayerState:
 	return null
 
 
+func get_builtin_cannon_remaining(player_number: int) -> float:
+	var player := get_player(player_number)
+	if player == null:
+		return 0.0
+	return player.mech.get_builtin_cannon_remaining(balance.builtin_cannon_activation_interval_seconds)
+
+
 func try_play_card(player_number: int, card: CardData, slot_index: int) -> int:
 	if match_state != MatchState.ACTIVE:
 		return PlayerState.PlayPartResult.INVALID_CARD

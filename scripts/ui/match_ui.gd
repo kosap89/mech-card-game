@@ -8,6 +8,7 @@ var p1_health: Label
 var p1_health_bar: ProgressBar
 var p1_damage: Label
 var p1_scrap: Label
+var p1_builtin_cannon: Label
 var p1_hand_container: HBoxContainer
 var p1_card_debug: Label
 var p1_selected_label: Label
@@ -17,6 +18,7 @@ var p2_health: Label
 var p2_health_bar: ProgressBar
 var p2_damage: Label
 var p2_scrap: Label
+var p2_builtin_cannon: Label
 var p2_hand_container: HBoxContainer
 var p2_card_debug: Label
 var p2_selected_label: Label
@@ -48,6 +50,12 @@ func _ready() -> void:
 	_refresh()
 
 
+func _process(_delta: float) -> void:
+	if p1_builtin_cannon == null or p2_builtin_cannon == null:
+		return
+	_refresh_activation_displays()
+
+
 func _build_placeholder_ui() -> void:
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -59,7 +67,7 @@ func _build_placeholder_ui() -> void:
 	var root := VBoxContainer.new()
 	root.add_theme_constant_override("separation", 5)
 	margin.add_child(root)
-	root.add_child(_label("MECH CARD GAME - PHASE 10 TEST MATCH", 20))
+	root.add_child(_label("MECH CARD GAME - PHASE 11 TEST MATCH", 20))
 	state_label = _label("", 16)
 	root.add_child(state_label)
 	result_label = _label("", 18)
@@ -79,6 +87,7 @@ func _build_placeholder_ui() -> void:
 	p1_selected_label = p1_widgets[6]
 	p1_slot_buttons.assign(p1_widgets[7])
 	p1_trash_buttons.assign(p1_widgets[8])
+	p1_builtin_cannon = p1_widgets[9]
 	var p2_widgets := _build_player_panel(players, 2)
 	p2_health = p2_widgets[0]
 	p2_health_bar = p2_widgets[1]
@@ -89,6 +98,7 @@ func _build_placeholder_ui() -> void:
 	p2_selected_label = p2_widgets[6]
 	p2_slot_buttons.assign(p2_widgets[7])
 	p2_trash_buttons.assign(p2_widgets[8])
+	p2_builtin_cannon = p2_widgets[9]
 	_build_debug_panel(root)
 	feedback_label = _label("Select a card, then select one of that player's slots.", 16)
 	root.add_child(feedback_label)
@@ -111,32 +121,36 @@ func _build_player_panel(parent: Control, player_number: int) -> Array:
 	box.add_child(damage_label)
 	var scrap_label := _label("SCRAP: 0", 17)
 	box.add_child(scrap_label)
-	var cannon_interval_text := ("%.1f" % match_controller.balance.builtin_cannon_activation_interval_seconds).trim_suffix(".0")
-	box.add_child(_label("Built-in Cannon: %d DMG / %ss" % [match_controller.balance.builtin_cannon_damage, cannon_interval_text], 13))
-	box.add_child(_label("Exactly 4 generic mech slots", 14))
+	var builtin_cannon_label := _label("", 13)
+	box.add_child(builtin_cannon_label)
 	var slots := GridContainer.new()
 	slots.columns = 2
+	slots.add_theme_constant_override("h_separation", 4)
+	slots.add_theme_constant_override("v_separation", 4)
 	box.add_child(slots)
 	var slot_buttons: Array[Button] = []
 	var trash_buttons: Array[Button] = []
 	for index in MechState.SLOT_COUNT:
+		var module_panel := PanelContainer.new()
+		module_panel.custom_minimum_size = Vector2(0, 92)
+		module_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		slots.add_child(module_panel)
+		var module_box := VBoxContainer.new()
+		module_box.add_theme_constant_override("separation", 2)
+		module_panel.add_child(module_box)
 		var slot := Button.new()
 		slot.text = "Slot %d\nEMPTY" % (index + 1)
 		slot.pressed.connect(_on_slot_pressed.bind(player_number, index))
-		slot.custom_minimum_size = Vector2(0, 62)
+		slot.custom_minimum_size = Vector2(0, 58)
 		slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		slots.add_child(slot)
+		slot.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		module_box.add_child(slot)
 		slot_buttons.append(slot)
-	var trash_grid := GridContainer.new()
-	trash_grid.columns = 4
-	trash_grid.add_theme_constant_override("h_separation", 3)
-	box.add_child(trash_grid)
-	for index in MechState.SLOT_COUNT:
 		var trash_button := Button.new()
-		trash_button.text = "Trash S%d" % (index + 1)
+		trash_button.text = "Trash"
 		trash_button.pressed.connect(_on_trash_pressed.bind(player_number, index))
 		trash_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		trash_grid.add_child(trash_button)
+		module_box.add_child(trash_button)
 		trash_buttons.append(trash_button)
 	var selected_label := _label("Selected card: None", 13)
 	box.add_child(selected_label)
@@ -151,7 +165,7 @@ func _build_player_panel(parent: Control, player_number: int) -> Array:
 	hand_scroll.add_child(hand_container)
 	var card_debug := _label("Deck: 0 | Hand: 0", 12)
 	box.add_child(card_debug)
-	return [health_label, health_bar, damage_label, scrap_label, hand_container, card_debug, selected_label, slot_buttons, trash_buttons]
+	return [health_label, health_bar, damage_label, scrap_label, hand_container, card_debug, selected_label, slot_buttons, trash_buttons, builtin_cannon_label]
 
 
 func _build_debug_panel(parent: Control) -> void:
@@ -343,9 +357,15 @@ func _refresh_player_slots(player: PlayerState, buttons: Array[Button], trash_bu
 	var human_controlled := player.player_number == 1
 	for slot_index in MechState.SLOT_COUNT:
 		var part: MechPart = player.mech.slots[slot_index]
-		buttons[slot_index].text = "Slot %d\nEMPTY" % (slot_index + 1) if part == null else "Slot %d - %s\nHP: %d / %d | DMG: %d\nFire: %ss" % [slot_index + 1, part.card_data.display_name, part.current_health, part.max_health, part.card_data.damage, _format_activation_interval(part.card_data.activation_interval)]
+		buttons[slot_index].text = "SLOT %d\nEMPTY" % (slot_index + 1) if part == null else "SLOT %d - %s\nDMG: %d | HP: %d / %d | Fire: %ss\nNext: %.1fs" % [slot_index + 1, part.card_data.display_name, part.card_data.damage, part.current_health, part.max_health, _format_activation_interval(part.card_data.activation_interval), part.get_activation_remaining()]
 		buttons[slot_index].disabled = not active or not human_controlled
 		trash_buttons[slot_index].disabled = not active or not human_controlled or part == null
+
+
+func _refresh_activation_displays() -> void:
+	p1_builtin_cannon.text = "Built-in Cannon | DMG: %d | Next: %.1fs" % [match_controller.balance.builtin_cannon_damage, match_controller.get_builtin_cannon_remaining(1)]
+	p2_builtin_cannon.text = "Built-in Cannon | DMG: %d | Next: %.1fs" % [match_controller.balance.builtin_cannon_damage, match_controller.get_builtin_cannon_remaining(2)]
+	_refresh_slots()
 
 
 func _on_ai_card_played(card_name: String, slot_index: int, replaced: bool, old_part_name: String) -> void:
@@ -399,4 +419,4 @@ func _refresh() -> void:
 	for button in part_debug_buttons:
 		button.disabled = not active
 	_refresh_cards()
-	_refresh_slots()
+	_refresh_activation_displays()

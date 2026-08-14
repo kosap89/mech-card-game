@@ -47,6 +47,12 @@ func advance_builtin_cannon(delta: float, activation_interval: float) -> int:
 	return activation_count
 
 
+func get_builtin_cannon_remaining(activation_interval: float) -> float:
+	if activation_interval <= 0.0:
+		return 0.0
+	return clampf(activation_interval - builtin_cannon_elapsed, 0.0, activation_interval)
+
+
 func install_part(part: MechPart, slot_index: int) -> bool:
 	if part == null or not is_slot_empty(slot_index):
 		return false

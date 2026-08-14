@@ -110,7 +110,11 @@ func _test_phase9_ui() -> void:
 	main_scene.match_controller = controller
 	main_scene._ready()
 	var labels := _collect_label_text(main_scene)
-	_check(labels.count("Built-in Cannon: 10 DMG / 3s") == 2, "UI shows Built-in Cannon information for both mechs")
+	var builtin_label_count := 0
+	for label_text in labels:
+		if label_text.begins_with("Built-in Cannon"):
+			builtin_label_count += 1
+	_check(builtin_label_count == 2, "UI shows Built-in Cannon information for both mechs")
 	_check("3:00" not in labels, "UI no longer shows the old match countdown")
 	_check(main_scene.p1_scrap.text == "SCRAP: 0" and main_scene.p2_scrap.text == "SCRAP: 0", "UI formats Scrap as whole numbers")
 	main_scene.free()

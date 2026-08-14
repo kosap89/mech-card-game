@@ -40,3 +40,9 @@ func advance_activation(delta: float) -> int:
 		activation_elapsed -= card_data.activation_interval
 		activation_count += 1
 	return activation_count
+
+
+func get_activation_remaining() -> float:
+	if card_data == null or card_data.activation_interval <= 0.0:
+		return 0.0
+	return clampf(card_data.activation_interval - activation_elapsed, 0.0, card_data.activation_interval)
