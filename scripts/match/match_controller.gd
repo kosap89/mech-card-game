@@ -5,8 +5,10 @@ signal match_started
 signal match_ended(result_text: String)
 signal state_changed
 signal ai_card_played(card_name: String, slot_index: int, replaced: bool, old_part_name: String)
+signal player_1_target_changed(target_type: int, slot_index: int)
 
 enum MatchState { READY, ACTIVE, ENDED }
+enum TargetType { MAIN_MECH, PART }
 
 @export var balance: BalanceConfig
 @export var test_deck: CardDeckDefinition
@@ -16,6 +18,9 @@ var player_2: PlayerState
 var match_state: int = MatchState.READY
 var result_text := ""
 var opponent_ai: SimpleOpponentAI
+var player_1_target_type: int = TargetType.MAIN_MECH
+var player_1_target_slot_index: int = -1
+var player_1_target_part: MechPart = null
 
 
 func _ready() -> void:
@@ -23,6 +28,7 @@ func _ready() -> void:
 	assert(test_deck != null, "MatchController requires a CardDeckDefinition resource.")
 	player_1 = PlayerState.new(1, balance.mech_max_health, balance.starting_scrap, test_deck, balance.draw_interval_seconds)
 	player_2 = PlayerState.new(2, balance.mech_max_health, balance.starting_scrap, test_deck, balance.draw_interval_seconds)
+	player_2.mech.slots_changed.connect(_validate_player_1_target)
 	opponent_ai = SimpleOpponentAI.new(self, 2, balance.ai_decision_interval_seconds)
 	opponent_ai.card_played.connect(_on_ai_card_played)
 	start_match()
@@ -48,6 +54,7 @@ func _process(delta: float) -> void:
 
 
 func start_match() -> void:
+	_reset_player_1_target(false)
 	player_1.reset(balance.starting_hand_size)
 	player_2.reset(balance.starting_hand_size)
 	result_text = ""
@@ -109,6 +116,26 @@ func try_trash_part(player_number: int, slot_index: int) -> int:
 	return player.try_trash_part(slot_index, balance.scrap_return_fraction)
 
 
+func set_player_1_target_main_mech() -> bool:
+	if match_state != MatchState.ACTIVE:
+		return false
+	_reset_player_1_target()
+	return true
+
+
+func set_player_1_target_part(slot_index: int) -> bool:
+	if match_state != MatchState.ACTIVE or not player_2.mech.is_valid_slot(slot_index):
+		return false
+	var part: MechPart = player_2.mech.slots[slot_index]
+	if part == null:
+		return false
+	player_1_target_type = TargetType.PART
+	player_1_target_slot_index = slot_index
+	player_1_target_part = part
+	player_1_target_changed.emit(player_1_target_type, player_1_target_slot_index)
+	return true
+
+
 func apply_mech_damage(attacker: PlayerState, defender: PlayerState, amount: int) -> int:
 	if match_state != MatchState.ACTIVE or attacker == null or defender == null or attacker == defender:
 		return 0
@@ -136,7 +163,35 @@ func _update_player_combat(attacker: PlayerState, defender: PlayerState, delta: 
 		for activation_index in activation_count:
 			if match_state != MatchState.ACTIVE:
 				return
-			apply_mech_damage(attacker, defender, part.card_data.damage)
+			if attacker == player_1:
+				_apply_player_1_installed_weapon_damage(part.card_data.damage)
+			else:
+				apply_mech_damage(attacker, defender, part.card_data.damage)
+
+
+func _apply_player_1_installed_weapon_damage(amount: int) -> int:
+	_validate_player_1_target()
+	if player_1_target_type == TargetType.PART:
+		return player_2.mech.damage_part(player_1_target_slot_index, amount)
+	return apply_mech_damage(player_1, player_2, amount)
+
+
+func _validate_player_1_target() -> void:
+	if player_1_target_type != TargetType.PART:
+		return
+	var valid := player_2.mech.is_valid_slot(player_1_target_slot_index)
+	valid = valid and player_2.mech.slots[player_1_target_slot_index] == player_1_target_part
+	if not valid:
+		_reset_player_1_target()
+
+
+func _reset_player_1_target(emit_change: bool = true) -> void:
+	var changed := player_1_target_type != TargetType.MAIN_MECH or player_1_target_slot_index != -1 or player_1_target_part != null
+	player_1_target_type = TargetType.MAIN_MECH
+	player_1_target_slot_index = -1
+	player_1_target_part = null
+	if emit_change and changed:
+		player_1_target_changed.emit(player_1_target_type, player_1_target_slot_index)
 
 
 func damage_debug_part(player_number: int, slot_index: int, amount: int = -1) -> int:

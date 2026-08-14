@@ -87,7 +87,7 @@ func _test_countdown_ui(light: CardData, heavy: CardData) -> void:
 	controller.player_2.mech.install_part(MechPart.new(heavy, controller.player_2, 0), 0)
 	_check("Next: 2.0s" in main_scene.p1_slot_buttons[0].text and "Next: 4.0s" in main_scene.p2_slot_buttons[0].text, "Both players show fresh installed-weapon countdowns")
 	_check(main_scene.p1_slot_buttons[0].get_parent().get_parent() is PanelContainer, "Installed weapon uses a card-like panel container")
-	_check(not main_scene.p1_slot_buttons[0].disabled and main_scene.p2_slot_buttons[0].disabled and main_scene.p2_trash_buttons[0].disabled, "Player 1 module is interactive while Player 2 controls remain disabled")
+	_check(not main_scene.p1_slot_buttons[0].disabled and not main_scene.p2_slot_buttons[0].disabled and main_scene.p2_trash_buttons[0].disabled, "Player modules remain interactive and occupied enemy modules are targetable without enabling enemy Trash")
 	var original_hand_button: Button = main_scene.p1_hand_container.get_child(0)
 	controller._process(0.5)
 	main_scene._process(0.0)

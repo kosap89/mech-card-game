@@ -16,6 +16,7 @@ var p1_slot_buttons: Array[Button] = []
 var p1_trash_buttons: Array[Button] = []
 var p2_health: Label
 var p2_health_bar: ProgressBar
+var p2_mech_target_button: Button
 var p2_damage: Label
 var p2_scrap: Label
 var p2_builtin_cannon: Label
@@ -52,6 +53,7 @@ func _ready() -> void:
 	match_controller.player_2.damage_total_changed.connect(_on_damage_total_changed)
 	match_controller.match_started.connect(_on_match_started)
 	match_controller.ai_card_played.connect(_on_ai_card_played)
+	match_controller.player_1_target_changed.connect(_on_player_1_target_changed)
 	_refresh()
 
 
@@ -74,7 +76,7 @@ func _build_placeholder_ui() -> void:
 	margin.add_child(root)
 	var header := HBoxContainer.new()
 	root.add_child(header)
-	var title := _label("MECH CARD GAME - PHASE 12 BOARD", 18)
+	var title := _label("MECH CARD GAME - PHASE 13 TARGETING", 18)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
 	state_label = _label("", 14)
@@ -96,9 +98,10 @@ func _build_enemy_area(parent: Control) -> void:
 	enemy_area.add_child(box)
 	var status := HBoxContainer.new()
 	box.add_child(status)
-	var heading := _label("PLAYER 2 - AI", 17)
-	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	status.add_child(heading)
+	p2_mech_target_button = Button.new()
+	p2_mech_target_button.pressed.connect(_on_enemy_mech_target_pressed)
+	p2_mech_target_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status.add_child(p2_mech_target_button)
 	p2_health = _label("", 14)
 	p2_health.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status.add_child(p2_health)
@@ -343,8 +346,12 @@ func _on_card_pressed(player_number: int, card: CardData) -> void:
 
 
 func _on_slot_pressed(player_number: int, slot_index: int) -> void:
-	if player_number != 1:
-		feedback_label.text = "Player 2 slots are controlled by the AI."
+	if player_number == 2:
+		if match_controller.set_player_1_target_part(slot_index):
+			var target_part: MechPart = match_controller.player_2.mech.slots[slot_index]
+			feedback_label.text = "Targeting enemy %s." % target_part.card_data.display_name
+		else:
+			feedback_label.text = "Only occupied enemy weapon slots can be targeted."
 		return
 	var card: CardData = selected_cards[player_number]
 	if card == null:
@@ -369,6 +376,16 @@ func _on_slot_pressed(player_number: int, slot_index: int) -> void:
 		_:
 			feedback_label.text = "Card installation is not available."
 	_refresh()
+
+
+func _on_enemy_mech_target_pressed() -> void:
+	if match_controller.set_player_1_target_main_mech():
+		feedback_label.text = "Targeting enemy main mech."
+
+
+func _on_player_1_target_changed(_target_type: int, _slot_index: int) -> void:
+	_refresh_target_presentation()
+	_refresh_slots()
 
 
 func _on_trash_pressed(player_number: int, slot_index: int) -> void:
@@ -421,8 +438,10 @@ func _refresh_player_slots(player: PlayerState, buttons: Array[Button], trash_bu
 	var human_controlled := player.player_number == 1
 	for slot_index in MechState.SLOT_COUNT:
 		var part: MechPart = player.mech.slots[slot_index]
-		buttons[slot_index].text = "SLOT %d\nEMPTY" % (slot_index + 1) if part == null else "SLOT %d - %s\nDMG: %d | HP: %d / %d | Fire: %ss\nNext: %.1fs" % [slot_index + 1, part.card_data.display_name, part.card_data.damage, part.current_health, part.max_health, _format_activation_interval(part.card_data.activation_interval), part.get_activation_remaining()]
-		buttons[slot_index].disabled = not active or not human_controlled
+		var targeted := player.player_number == 2 and match_controller.player_1_target_type == MatchController.TargetType.PART and match_controller.player_1_target_slot_index == slot_index
+		var target_prefix := "[SELECTED TARGET]\n" if targeted else ""
+		buttons[slot_index].text = "%sSLOT %d\nEMPTY" % [target_prefix, slot_index + 1] if part == null else "%sSLOT %d - %s\nDMG: %d | HP: %d / %d | Fire: %ss\nNext: %.1fs" % [target_prefix, slot_index + 1, part.card_data.display_name, part.card_data.damage, part.current_health, part.max_health, _format_activation_interval(part.card_data.activation_interval), part.get_activation_remaining()]
+		buttons[slot_index].disabled = not active or (not human_controlled and part == null)
 		trash_buttons[slot_index].disabled = not active or not human_controlled or part == null
 
 
@@ -468,6 +487,15 @@ func _refresh_mech_combat_state() -> void:
 	p2_health_bar.max_value = match_controller.player_2.mech.max_health
 	p2_health_bar.value = match_controller.player_2.mech.current_health
 	p2_damage.text = "Total mech damage dealt: %d" % match_controller.player_2.total_mech_damage_dealt
+	_refresh_target_presentation()
+
+
+func _refresh_target_presentation() -> void:
+	if p2_mech_target_button == null:
+		return
+	var targeting_mech := match_controller.player_1_target_type == MatchController.TargetType.MAIN_MECH
+	p2_mech_target_button.text = "%sPLAYER 2 - AI\nEnemy Main Mech" % ("[SELECTED TARGET]\n" if targeting_mech else "")
+	p2_mech_target_button.disabled = match_controller.match_state != MatchController.MatchState.ACTIVE
 
 
 func _refresh() -> void:
