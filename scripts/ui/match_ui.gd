@@ -36,6 +36,8 @@ var player_area: PanelContainer
 var debug_panel: PanelContainer
 var restart_button: Button
 var selected_cards: Dictionary = {1: null, 2: null}
+var selected_weapon_slot: int = -1
+var selected_weapon_part: MechPart = null
 
 
 func _ready() -> void:
@@ -53,7 +55,7 @@ func _ready() -> void:
 	match_controller.player_2.damage_total_changed.connect(_on_damage_total_changed)
 	match_controller.match_started.connect(_on_match_started)
 	match_controller.ai_card_played.connect(_on_ai_card_played)
-	match_controller.player_1_target_changed.connect(_on_player_1_target_changed)
+	match_controller.player_1_weapon_targets_changed.connect(_on_player_1_weapon_targets_changed)
 	_refresh()
 
 
@@ -76,7 +78,7 @@ func _build_placeholder_ui() -> void:
 	margin.add_child(root)
 	var header := HBoxContainer.new()
 	root.add_child(header)
-	var title := _label("MECH CARD GAME - PHASE 13 TARGETING", 18)
+	var title := _label("MECH CARD GAME - PHASE 14 PER-WEAPON TARGETING", 18)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
 	state_label = _label("", 14)
@@ -314,6 +316,7 @@ func _on_cards_changed(_deck_count: int, _hand_count: int) -> void:
 
 
 func _on_slots_changed() -> void:
+	_clear_invalid_weapon_selection()
 	_refresh_slots()
 
 
@@ -328,6 +331,7 @@ func _on_damage_total_changed(_total: int) -> void:
 func _on_match_started() -> void:
 	selected_cards[1] = null
 	selected_cards[2] = null
+	_clear_weapon_selection()
 	if feedback_label != null:
 		feedback_label.text = "New match started. Select a card, then an empty own slot."
 	_refresh()
@@ -340,22 +344,39 @@ func _on_card_pressed(player_number: int, card: CardData) -> void:
 	if match_controller.match_state != MatchController.MatchState.ACTIVE:
 		feedback_label.text = "Cards cannot be selected after the match ends."
 		return
+	_clear_weapon_selection()
 	selected_cards[player_number] = card
 	feedback_label.text = "Player %d selected %s (Cost %d)." % [player_number, card.display_name, card.cost]
+	_refresh_slots()
+	_refresh_target_presentation()
 	_refresh_cards()
 
 
 func _on_slot_pressed(player_number: int, slot_index: int) -> void:
 	if player_number == 2:
-		if match_controller.set_player_1_target_part(slot_index):
+		if selected_weapon_slot < 0:
+			feedback_label.text = "Select one of your installed weapons first."
+			return
+		if match_controller.set_player_1_weapon_target_part(selected_weapon_slot, slot_index):
 			var target_part: MechPart = match_controller.player_2.mech.slots[slot_index]
-			feedback_label.text = "Targeting enemy %s." % target_part.card_data.display_name
+			feedback_label.text = "%s now targets enemy %s." % [selected_weapon_part.card_data.display_name, target_part.card_data.display_name]
+			_clear_weapon_selection()
+			_refresh_slots()
+			_refresh_target_presentation()
 		else:
 			feedback_label.text = "Only occupied enemy weapon slots can be targeted."
 		return
 	var card: CardData = selected_cards[player_number]
 	if card == null:
-		feedback_label.text = "Select a Player %d card first." % player_number
+		var own_part: MechPart = match_controller.player_1.mech.slots[slot_index]
+		if own_part == null:
+			feedback_label.text = "Select a card before clicking an empty slot."
+			return
+		selected_weapon_slot = slot_index
+		selected_weapon_part = own_part
+		feedback_label.text = "Select a target for %s." % own_part.card_data.display_name
+		_refresh_slots()
+		_refresh_target_presentation()
 		return
 	var old_part: MechPart = match_controller.get_player(player_number).mech.slots[slot_index]
 	var old_part_name := "" if old_part == null else old_part.card_data.display_name
@@ -379,11 +400,17 @@ func _on_slot_pressed(player_number: int, slot_index: int) -> void:
 
 
 func _on_enemy_mech_target_pressed() -> void:
-	if match_controller.set_player_1_target_main_mech():
-		feedback_label.text = "Targeting enemy main mech."
+	if selected_weapon_slot < 0:
+		feedback_label.text = "Select one of your installed weapons first."
+		return
+	if match_controller.set_player_1_weapon_target_main_mech(selected_weapon_slot):
+		feedback_label.text = "%s now targets the enemy main mech." % selected_weapon_part.card_data.display_name
+		_clear_weapon_selection()
+		_refresh_slots()
+		_refresh_target_presentation()
 
 
-func _on_player_1_target_changed(_target_type: int, _slot_index: int) -> void:
+func _on_player_1_weapon_targets_changed() -> void:
 	_refresh_target_presentation()
 	_refresh_slots()
 
@@ -401,6 +428,7 @@ func _on_trash_pressed(player_number: int, slot_index: int) -> void:
 	var scrap_return: int = player.calculate_scrap_return(part, match_controller.balance.scrap_return_fraction)
 	var result := match_controller.try_trash_part(player_number, slot_index)
 	if result == PlayerState.TrashPartResult.SUCCESS:
+		_clear_invalid_weapon_selection()
 		feedback_label.text = "Trashed %s for %d Scrap." % [part_name, scrap_return]
 	else:
 		feedback_label.text = "Part cannot be Trashed right now."
@@ -438,9 +466,15 @@ func _refresh_player_slots(player: PlayerState, buttons: Array[Button], trash_bu
 	var human_controlled := player.player_number == 1
 	for slot_index in MechState.SLOT_COUNT:
 		var part: MechPart = player.mech.slots[slot_index]
-		var targeted := player.player_number == 2 and match_controller.player_1_target_type == MatchController.TargetType.PART and match_controller.player_1_target_slot_index == slot_index
-		var target_prefix := "[SELECTED TARGET]\n" if targeted else ""
-		buttons[slot_index].text = "%sSLOT %d\nEMPTY" % [target_prefix, slot_index + 1] if part == null else "%sSLOT %d - %s\nDMG: %d | HP: %d / %d | Fire: %ss\nNext: %.1fs" % [target_prefix, slot_index + 1, part.card_data.display_name, part.card_data.damage, part.current_health, part.max_health, _format_activation_interval(part.card_data.activation_interval), part.get_activation_remaining()]
+		var target_prefix := ""
+		if player.player_number == 1 and selected_weapon_slot == slot_index and selected_weapon_part == part:
+			target_prefix = "[SELECT TARGET]\n"
+		elif player.player_number == 2 and _selected_weapon_targets_enemy_slot(slot_index):
+			target_prefix = "[CURRENT TARGET]\n"
+		var target_text := ""
+		if player.player_number == 1 and part != null:
+			target_text = "\nTarget: %s" % _get_weapon_target_text(part)
+		buttons[slot_index].text = "%sSLOT %d\nEMPTY" % [target_prefix, slot_index + 1] if part == null else "%sSLOT %d - %s\nDMG: %d | HP: %d / %d | Fire: %ss\nNext: %.1fs%s" % [target_prefix, slot_index + 1, part.card_data.display_name, part.card_data.damage, part.current_health, part.max_health, _format_activation_interval(part.card_data.activation_interval), part.get_activation_remaining(), target_text]
 		buttons[slot_index].disabled = not active or (not human_controlled and part == null)
 		trash_buttons[slot_index].disabled = not active or not human_controlled or part == null
 
@@ -493,12 +527,40 @@ func _refresh_mech_combat_state() -> void:
 func _refresh_target_presentation() -> void:
 	if p2_mech_target_button == null:
 		return
-	var targeting_mech := match_controller.player_1_target_type == MatchController.TargetType.MAIN_MECH
-	p2_mech_target_button.text = "%sPLAYER 2 - AI\nEnemy Main Mech" % ("[SELECTED TARGET]\n" if targeting_mech else "")
+	var targeting_mech := selected_weapon_part != null and selected_weapon_part.target_type == MechPart.TargetType.MAIN_MECH
+	p2_mech_target_button.text = "%sPLAYER 2 - AI\nEnemy Main Mech" % ("[CURRENT TARGET]\n" if targeting_mech else "")
 	p2_mech_target_button.disabled = match_controller.match_state != MatchController.MatchState.ACTIVE
 
 
+func _selected_weapon_targets_enemy_slot(enemy_slot_index: int) -> bool:
+	return selected_weapon_part != null and selected_weapon_part.target_type == MechPart.TargetType.PART and selected_weapon_part.target_slot_index == enemy_slot_index
+
+
+func _get_weapon_target_text(weapon: MechPart) -> String:
+	if weapon.target_type != MechPart.TargetType.PART:
+		return "Enemy Mech"
+	if match_controller.player_2.mech.is_valid_slot(weapon.target_slot_index):
+		var enemy_part: MechPart = match_controller.player_2.mech.slots[weapon.target_slot_index]
+		if enemy_part != null and enemy_part == weapon.target_part:
+			return "%s (Enemy Slot %d)" % [enemy_part.card_data.display_name, weapon.target_slot_index + 1]
+	return "Enemy Mech"
+
+
+func _clear_invalid_weapon_selection() -> void:
+	if selected_weapon_slot < 0:
+		return
+	if not match_controller.player_1.mech.is_valid_slot(selected_weapon_slot) or match_controller.player_1.mech.slots[selected_weapon_slot] != selected_weapon_part:
+		_clear_weapon_selection()
+
+
+func _clear_weapon_selection() -> void:
+	selected_weapon_slot = -1
+	selected_weapon_part = null
+
+
 func _refresh() -> void:
+	if match_controller.match_state != MatchController.MatchState.ACTIVE:
+		_clear_weapon_selection()
 	state_label.text = "State: %s" % match_controller.get_state_name()
 	result_label.text = match_controller.result_text
 	_refresh_mech_combat_state()
