@@ -8,7 +8,7 @@ var failures: Array[String] = []
 
 func _init() -> void:
 	var controller := _new_controller()
-	var cannon: CardData = load("res://data/cards/basic_cannon.tres")
+	var cannon: CardData = load("res://data/cards/light_cannon.tres")
 	var armor: CardData = load("res://data/cards/armor_plate.tres")
 	var player := controller.player_1
 

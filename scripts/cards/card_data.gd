@@ -1,6 +1,9 @@
 class_name CardData
 extends Resource
 
+# TODO(balance): Phase 10 weapon names and values are temporary combat-flow test data.
+# Special weapon identities may be added only when their gameplay is explicitly designed.
+
 enum CardType { PART }
 
 @export var id: StringName

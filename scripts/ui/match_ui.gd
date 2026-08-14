@@ -59,7 +59,7 @@ func _build_placeholder_ui() -> void:
 	var root := VBoxContainer.new()
 	root.add_theme_constant_override("separation", 5)
 	margin.add_child(root)
-	root.add_child(_label("MECH CARD GAME - PHASE 9 TEST MATCH", 20))
+	root.add_child(_label("MECH CARD GAME - PHASE 10 TEST MATCH", 20))
 	state_label = _label("", 16)
 	root.add_child(state_label)
 	result_label = _label("", 18)
@@ -123,7 +123,7 @@ func _build_player_panel(parent: Control, player_number: int) -> Array:
 		var slot := Button.new()
 		slot.text = "Slot %d\nEMPTY" % (index + 1)
 		slot.pressed.connect(_on_slot_pressed.bind(player_number, index))
-		slot.custom_minimum_size = Vector2(0, 52)
+		slot.custom_minimum_size = Vector2(0, 62)
 		slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		slots.add_child(slot)
 		slot_buttons.append(slot)
@@ -142,7 +142,7 @@ func _build_player_panel(parent: Control, player_number: int) -> Array:
 	box.add_child(selected_label)
 	box.add_child(_label("HAND - select a card to install", 13))
 	var hand_scroll := ScrollContainer.new()
-	hand_scroll.custom_minimum_size.y = 62
+	hand_scroll.custom_minimum_size.y = 84
 	hand_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	hand_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	box.add_child(hand_scroll)
@@ -260,7 +260,7 @@ func _on_card_pressed(player_number: int, card: CardData) -> void:
 		feedback_label.text = "Cards cannot be selected after the match ends."
 		return
 	selected_cards[player_number] = card
-	feedback_label.text = "Player %d selected %s (Cost %.0f)." % [player_number, card.display_name, card.cost]
+	feedback_label.text = "Player %d selected %s (Cost %d)." % [player_number, card.display_name, card.cost]
 	_refresh_cards()
 
 
@@ -323,14 +323,14 @@ func _refresh_player_cards(player: PlayerState, container: HBoxContainer, debug_
 	for card in player.hand:
 		var card_display := Button.new()
 		var selected: bool = selected_cards[player.player_number] == card
-		card_display.text = "%s%s\nCost: %.0f" % ["[SELECTED]\n" if selected else "", card.display_name, card.cost]
+		card_display.text = "%s%s\nCost: %d\nDMG: %d | Fire: %ss\nHP: %d" % ["[SELECTED] " if selected else "", card.display_name, card.cost, card.damage, _format_activation_interval(card.activation_interval), card.max_health]
 		card_display.disabled = match_controller.match_state != MatchController.MatchState.ACTIVE or player.player_number != 1
 		card_display.pressed.connect(_on_card_pressed.bind(player.player_number, card))
-		card_display.custom_minimum_size = Vector2(105, 58)
+		card_display.custom_minimum_size = Vector2(150, 80)
 		container.add_child(card_display)
 	debug_label.text = "DEVELOPMENT CARD INFO - Deck: %d | Hand: %d" % [player.deck.size(), player.hand.size()]
 	var selected_card: CardData = selected_cards[player.player_number]
-	selected_label.text = "Selected card: %s" % ("None" if selected_card == null else "%s (Cost %.0f)" % [selected_card.display_name, selected_card.cost])
+	selected_label.text = "Selected card: %s" % ("None" if selected_card == null else "%s (Cost %d)" % [selected_card.display_name, selected_card.cost])
 
 
 func _refresh_slots() -> void:
@@ -343,7 +343,7 @@ func _refresh_player_slots(player: PlayerState, buttons: Array[Button], trash_bu
 	var human_controlled := player.player_number == 1
 	for slot_index in MechState.SLOT_COUNT:
 		var part: MechPart = player.mech.slots[slot_index]
-		buttons[slot_index].text = "Slot %d\n%s" % [slot_index + 1, "EMPTY" if part == null else "%s\nHP: %d / %d" % [part.card_data.display_name, part.current_health, part.max_health]]
+		buttons[slot_index].text = "Slot %d\nEMPTY" % (slot_index + 1) if part == null else "Slot %d - %s\nHP: %d / %d | DMG: %d\nFire: %ss" % [slot_index + 1, part.card_data.display_name, part.current_health, part.max_health, part.card_data.damage, _format_activation_interval(part.card_data.activation_interval)]
 		buttons[slot_index].disabled = not active or not human_controlled
 		trash_buttons[slot_index].disabled = not active or not human_controlled or part == null
 
@@ -353,6 +353,13 @@ func _on_ai_card_played(card_name: String, slot_index: int, replaced: bool, old_
 		feedback_label.text = "AI replaced %s with %s in Slot %d." % [old_part_name, card_name, slot_index + 1]
 	else:
 		feedback_label.text = "AI installed %s in Slot %d." % [card_name, slot_index + 1]
+
+
+func _format_activation_interval(seconds: float) -> String:
+	var formatted := "%.2f" % seconds
+	if formatted.ends_with("0"):
+		formatted = formatted.trim_suffix("0")
+	return formatted
 
 
 func _clear_invalid_selections() -> void:

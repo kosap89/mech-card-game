@@ -9,13 +9,13 @@ var failures: Array[String] = []
 func _init() -> void:
 	_test_ui_minimum_size()
 	var controller := _new_controller()
-	var cannon: CardData = load("res://data/cards/basic_cannon.tres")
-	_check(cannon.max_health == 40 and cannon.damage == 10 and is_equal_approx(cannon.activation_interval, 2.0), "Basic Cannon uses configured Phase 6 values")
+	var cannon: CardData = load("res://data/cards/light_cannon.tres")
+	_check(cannon.max_health == 40 and cannon.damage == 10 and is_equal_approx(cannon.activation_interval, 2.0), "Light Cannon preserves the original installed-weapon behavior")
 	var cannon_count := 0
 	for deck_card in controller.test_deck.cards:
-		if deck_card.display_name == "Basic Cannon":
+		if deck_card.display_name == "Light Cannon":
 			cannon_count += 1
-	_check(cannon_count >= 4, "Temporary test deck contains at least four Basic Cannons per player (found %d)" % cannon_count)
+	_check(cannon_count == 2, "Phase 10 test deck contains two Light Cannons per player (found %d)" % cannon_count)
 
 	var cannon_part := _install_test_part(controller.player_1, cannon, 0)
 	_check(cannon_part.current_health == cannon_part.max_health and cannon_part.max_health == cannon.max_health, "Installed part begins at full configured Health")

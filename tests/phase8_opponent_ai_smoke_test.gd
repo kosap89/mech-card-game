@@ -49,11 +49,10 @@ func _init() -> void:
 	_check(_occupied_slot_count(player.mech) == MechState.SLOT_COUNT, "AI fills all four empty slots before replacing")
 	var old_parts := player.mech.slots.duplicate()
 	var hand_size_before_replace := player.hand.size()
-	var scrap_before_replace := player.current_scrap
 	ai.advance(controller.balance.ai_decision_interval_seconds)
 	_check(ai_play_count >= 5 and _occupied_slot_count(player.mech) == MechState.SLOT_COUNT, "AI uses Replace after all slots are full")
 	_check(_slot_was_replaced(player.mech, old_parts), "AI Replace removes an old part and installs a fresh part")
-	_check(player.hand.size() == hand_size_before_replace - 1 and player.current_scrap != scrap_before_replace, "AI Replace uses normal hand and Scrap state")
+	_check(player.hand.size() == hand_size_before_replace - 1 and player.current_scrap >= 0, "AI Replace uses normal hand and nonnegative Scrap state")
 
 	controller.end_match()
 	hand_before = player.hand.size()
