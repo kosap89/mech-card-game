@@ -93,7 +93,7 @@ func _build_placeholder_ui() -> void:
 func _build_enemy_area(parent: Control) -> void:
 	enemy_area = PanelContainer.new()
 	enemy_area.name = "EnemyArea"
-	enemy_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	enemy_area.size_flags_vertical = Control.SIZE_FILL
 	parent.add_child(enemy_area)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 2)
@@ -112,12 +112,16 @@ func _build_enemy_area(parent: Control) -> void:
 	status.add_child(p2_damage)
 	p2_scrap = _label("SCRAP: 0", 12)
 	status.add_child(p2_scrap)
+	var mech_row := HBoxContainer.new()
+	mech_row.add_theme_constant_override("separation", 8)
+	box.add_child(mech_row)
 	p2_health_bar = ProgressBar.new()
 	p2_health_bar.show_percentage = false
-	p2_health_bar.custom_minimum_size.y = 12
-	box.add_child(p2_health_bar)
+	p2_health_bar.custom_minimum_size = Vector2(160, 10)
+	p2_health_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mech_row.add_child(p2_health_bar)
 	p2_builtin_cannon = _label("", 13)
-	box.add_child(p2_builtin_cannon)
+	mech_row.add_child(p2_builtin_cannon)
 	var slot_widgets := _build_slot_row(box, 2, false)
 	p2_slot_buttons.assign(slot_widgets[0])
 	p2_trash_buttons.assign(slot_widgets[1])
@@ -126,8 +130,12 @@ func _build_enemy_area(parent: Control) -> void:
 func _build_battle_area(parent: Control) -> void:
 	battle_area = PanelContainer.new()
 	battle_area.name = "BattleArea"
+	battle_area.custom_minimum_size.y = 150
+	battle_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	battle_area.size_flags_stretch_ratio = 3.0
 	parent.add_child(battle_area)
 	var box := VBoxContainer.new()
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 1)
 	battle_area.add_child(box)
 	box.add_child(_label("BATTLE", 16))
@@ -144,7 +152,7 @@ func _build_battle_area(parent: Control) -> void:
 func _build_player_area(parent: Control) -> void:
 	player_area = PanelContainer.new()
 	player_area.name = "PlayerArea"
-	player_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	player_area.size_flags_vertical = Control.SIZE_FILL
 	parent.add_child(player_area)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 2)
@@ -153,7 +161,6 @@ func _build_player_area(parent: Control) -> void:
 	p1_slot_buttons.assign(slot_widgets[0])
 	p1_trash_buttons.assign(slot_widgets[1])
 	p1_builtin_cannon = _label("", 13)
-	box.add_child(p1_builtin_cannon)
 	var status := HBoxContainer.new()
 	box.add_child(status)
 	var heading := _label("PLAYER 1 - HUMAN", 17)
@@ -167,16 +174,20 @@ func _build_player_area(parent: Control) -> void:
 	status.add_child(p1_damage)
 	p1_scrap = _label("SCRAP: 0", 18)
 	status.add_child(p1_scrap)
+	var mech_row := HBoxContainer.new()
+	mech_row.add_theme_constant_override("separation", 8)
+	box.add_child(mech_row)
 	p1_health_bar = ProgressBar.new()
 	p1_health_bar.show_percentage = false
-	p1_health_bar.custom_minimum_size.y = 12
-	box.add_child(p1_health_bar)
-	p1_selected_label = _label("Selected card: None", 12)
+	p1_health_bar.custom_minimum_size = Vector2(160, 10)
+	p1_health_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mech_row.add_child(p1_health_bar)
+	mech_row.add_child(p1_builtin_cannon)
+	p1_selected_label = _label("PLAYER 1 HAND | Selected card: None", 12)
 	box.add_child(p1_selected_label)
-	box.add_child(_label("PLAYER 1 HAND", 12))
 	var hand_scroll := ScrollContainer.new()
 	hand_scroll.name = "PlayerHandScroll"
-	hand_scroll.custom_minimum_size.y = 82
+	hand_scroll.custom_minimum_size.y = 64
 	hand_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	hand_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	box.add_child(hand_scroll)
@@ -196,7 +207,7 @@ func _build_slot_row(parent: Control, player_number: int, show_trash: bool) -> A
 	var trash_buttons: Array[Button] = []
 	for index in MechState.SLOT_COUNT:
 		var module_panel := PanelContainer.new()
-		module_panel.custom_minimum_size = Vector2(0, 72 if not show_trash else 94)
+		module_panel.custom_minimum_size = Vector2(0, 56 if not show_trash else 80)
 		module_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(module_panel)
 		var module_box := VBoxContainer.new()
@@ -205,7 +216,7 @@ func _build_slot_row(parent: Control, player_number: int, show_trash: bool) -> A
 		var slot := Button.new()
 		slot.text = "SLOT %d\nEMPTY" % (index + 1)
 		slot.pressed.connect(_on_slot_pressed.bind(player_number, index))
-		slot.custom_minimum_size = Vector2(0, 64)
+		slot.custom_minimum_size = Vector2(0, 50)
 		slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		slot.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		module_box.add_child(slot)
@@ -214,6 +225,7 @@ func _build_slot_row(parent: Control, player_number: int, show_trash: bool) -> A
 		trash_button.text = "Trash"
 		trash_button.pressed.connect(_on_trash_pressed.bind(player_number, index))
 		trash_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		trash_button.custom_minimum_size.y = 24
 		trash_button.visible = show_trash
 		trash_button.disabled = not show_trash
 		module_box.add_child(trash_button)
@@ -224,10 +236,18 @@ func _build_slot_row(parent: Control, player_number: int, show_trash: bool) -> A
 func _build_debug_panel(parent: Control) -> void:
 	debug_panel = PanelContainer.new()
 	debug_panel.name = "DevelopmentDebugArea"
+	debug_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	debug_panel.size_flags_stretch_ratio = 1.0
 	parent.add_child(debug_panel)
+	var debug_scroll := ScrollContainer.new()
+	debug_scroll.custom_minimum_size.y = 54
+	debug_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	debug_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	debug_panel.add_child(debug_scroll)
 	var box := VBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_theme_constant_override("separation", 1)
-	debug_panel.add_child(box)
+	debug_scroll.add_child(box)
 	var debug_header := HBoxContainer.new()
 	box.add_child(debug_header)
 	var debug_title := _label("DEVELOPMENT DEBUG - not game mechanics", 11)
@@ -446,14 +466,16 @@ func _refresh_player_cards(player: PlayerState, container: HBoxContainer, debug_
 	for card in player.hand:
 		var card_display := Button.new()
 		var selected: bool = selected_cards[player.player_number] == card
-		card_display.text = "%s%s\nCost: %d\nDMG: %d | Fire: %ss\nHP: %d" % ["[SELECTED] " if selected else "", card.display_name, card.cost, card.damage, _format_activation_interval(card.activation_interval), card.max_health]
+		card_display.text = "%s%s\nCost: %d | DMG: %d | HP: %d\nFire: %ss" % ["[SELECTED] " if selected else "", card.display_name, card.cost, card.damage, card.max_health, _format_activation_interval(card.activation_interval)]
 		card_display.disabled = match_controller.match_state != MatchController.MatchState.ACTIVE or player.player_number != 1
 		card_display.pressed.connect(_on_card_pressed.bind(player.player_number, card))
-		card_display.custom_minimum_size = Vector2(150, 80)
+		card_display.custom_minimum_size = Vector2(150, 62)
 		container.add_child(card_display)
 	debug_label.text = "DEVELOPMENT CARD INFO - Deck: %d | Hand: %d" % [player.deck.size(), player.hand.size()]
 	var selected_card: CardData = selected_cards[player.player_number]
-	selected_label.text = "Selected card: %s" % ("None" if selected_card == null else "%s (Cost %d)" % [selected_card.display_name, selected_card.cost])
+	selected_label.text = "PLAYER 1 HAND | Selected card: %s" % ("None" if selected_card == null else "%s (Cost %d)" % [selected_card.display_name, selected_card.cost])
+	if player.player_number != 1:
+		selected_label.text = "Selected card: %s" % ("None" if selected_card == null else "%s (Cost %d)" % [selected_card.display_name, selected_card.cost])
 
 
 func _refresh_slots() -> void:
@@ -468,13 +490,13 @@ func _refresh_player_slots(player: PlayerState, buttons: Array[Button], trash_bu
 		var part: MechPart = player.mech.slots[slot_index]
 		var target_prefix := ""
 		if player.player_number == 1 and selected_weapon_slot == slot_index and selected_weapon_part == part:
-			target_prefix = "[SELECT TARGET]\n"
+			target_prefix = "[SELECT TARGET] "
 		elif player.player_number == 2 and _selected_weapon_targets_enemy_slot(slot_index):
-			target_prefix = "[CURRENT TARGET]\n"
+			target_prefix = "[CURRENT TARGET] "
 		var target_text := ""
 		if player.player_number == 1 and part != null:
-			target_text = "\nTarget: %s" % _get_weapon_target_text(part)
-		buttons[slot_index].text = "%sSLOT %d\nEMPTY" % [target_prefix, slot_index + 1] if part == null else "%sSLOT %d - %s\nDMG: %d | HP: %d / %d | Fire: %ss\nNext: %.1fs%s" % [target_prefix, slot_index + 1, part.card_data.display_name, part.card_data.damage, part.current_health, part.max_health, _format_activation_interval(part.card_data.activation_interval), part.get_activation_remaining(), target_text]
+			target_text = " | Target: %s" % _get_weapon_target_text(part)
+		buttons[slot_index].text = "%sSLOT %d\nEMPTY" % [target_prefix, slot_index + 1] if part == null else "%sSLOT %d - %s\nDMG %d | HP %d/%d | Fire %ss\nNext: %.1fs%s" % [target_prefix, slot_index + 1, part.card_data.display_name, part.card_data.damage, part.current_health, part.max_health, _format_activation_interval(part.card_data.activation_interval), part.get_activation_remaining(), target_text]
 		buttons[slot_index].disabled = not active or (not human_controlled and part == null)
 		trash_buttons[slot_index].disabled = not active or not human_controlled or part == null
 
