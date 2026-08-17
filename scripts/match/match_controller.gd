@@ -6,6 +6,7 @@ signal match_ended(result_text: String)
 signal state_changed
 signal ai_card_played(card_name: String, slot_index: int)
 signal player_1_weapon_targets_changed
+signal weapon_exploded(weapon_name: String, owner_player_number: int, explosion_damage: int)
 
 enum MatchState { READY, ACTIVE, ENDED }
 
@@ -141,6 +142,24 @@ func apply_mech_damage(attacker: PlayerState, defender: PlayerState, amount: int
 	return applied
 
 
+func apply_part_damage(attacker: PlayerState, defender: PlayerState, slot_index: int, amount: int) -> int:
+	if match_state != MatchState.ACTIVE or attacker == null or defender == null or attacker == defender:
+		return 0
+	if not defender.mech.is_valid_slot(slot_index):
+		return 0
+	var part: MechPart = defender.mech.slots[slot_index]
+	if part == null or part.is_constructing:
+		return 0
+	var applied := defender.mech.damage_part(slot_index, amount)
+	if applied <= 0 or part.current_health > 0 or not part.mark_combat_destruction_resolved():
+		return applied
+	# Phase 16 temporary rule: an ACTIVE weapon explodes for its attack damage.
+	var explosion_damage := maxi(0, part.card_data.damage)
+	apply_mech_damage(attacker, defender, explosion_damage)
+	weapon_exploded.emit(part.card_data.display_name, defender.player_number, explosion_damage)
+	return applied
+
+
 func _update_builtin_cannon(attacker: PlayerState, defender: PlayerState, delta: float) -> void:
 	var activation_count := attacker.mech.advance_builtin_cannon(delta, balance.builtin_cannon_activation_interval_seconds)
 	for activation_index in activation_count:
@@ -151,6 +170,8 @@ func _update_builtin_cannon(attacker: PlayerState, defender: PlayerState, delta:
 
 func _update_player_combat(attacker: PlayerState, defender: PlayerState, delta: float) -> void:
 	for slot_value in attacker.mech.slots:
+		if match_state != MatchState.ACTIVE:
+			return
 		var part: MechPart = slot_value
 		if part == null:
 			continue
@@ -174,7 +195,7 @@ func _update_player_combat(attacker: PlayerState, defender: PlayerState, delta: 
 func _apply_player_1_installed_weapon_damage(weapon: MechPart, amount: int) -> int:
 	_validate_player_1_weapon_target(weapon)
 	if weapon.target_type == MechPart.TargetType.PART:
-		return player_2.mech.damage_part(weapon.target_slot_index, amount)
+		return apply_part_damage(player_1, player_2, weapon.target_slot_index, amount)
 	return apply_mech_damage(player_1, player_2, amount)
 
 
@@ -214,8 +235,9 @@ func damage_debug_part(player_number: int, slot_index: int, amount: int = -1) ->
 	var player := get_player(player_number)
 	if player == null:
 		return 0
+	var attacker := player_2 if player_number == 1 else player_1
 	var requested := balance.debug_part_damage_amount if amount < 0 else amount
-	return player.mech.damage_part(slot_index, requested)
+	return apply_part_damage(attacker, player, slot_index, requested)
 
 
 # Presentation calls this temporary test hook; it is not a gameplay action.

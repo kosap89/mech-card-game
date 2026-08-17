@@ -26,9 +26,10 @@ func _init() -> void:
 	_check(controller.player_2.mech.current_health == enemy_mech_health and controller.player_1.total_mech_damage_dealt == 0, "Part damage does not change main-mech Health or its damage statistic")
 	controller.damage_debug_part(2, 0, enemy_part.current_health)
 	_check(weapon.target_type == MechPart.TargetType.MAIN_MECH, "Destroyed targets fall back to the enemy main mech")
+	_check(controller.player_2.mech.current_health == enemy_mech_health - heavy.damage, "Destroyed target explosion damages its owning main mech")
 	weapon.activation_elapsed = light.activation_interval
 	controller._process(0.0)
-	_check(controller.player_2.mech.current_health == enemy_mech_health - light.damage, "The next shot after fallback damages the enemy main mech")
+	_check(controller.player_2.mech.current_health == enemy_mech_health - heavy.damage - light.damage, "The next shot after fallback damages the enemy main mech")
 	controller.free()
 
 	if failures.is_empty():

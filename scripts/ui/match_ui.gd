@@ -56,6 +56,7 @@ func _ready() -> void:
 	match_controller.match_started.connect(_on_match_started)
 	match_controller.ai_card_played.connect(_on_ai_card_played)
 	match_controller.player_1_weapon_targets_changed.connect(_on_player_1_weapon_targets_changed)
+	match_controller.weapon_exploded.connect(_on_weapon_exploded)
 	_refresh()
 
 
@@ -78,7 +79,7 @@ func _build_placeholder_ui() -> void:
 	margin.add_child(root)
 	var header := HBoxContainer.new()
 	root.add_child(header)
-	var title := _label("MECH CARD GAME - PHASE 15 WEAPON CONSTRUCTION", 18)
+	var title := _label("MECH CARD GAME - PHASE 16 WEAPON EXPLOSIONS", 18)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
 	state_label = _label("", 14)
@@ -514,6 +515,10 @@ func _refresh_activation_displays() -> void:
 
 func _on_ai_card_played(card_name: String, slot_index: int) -> void:
 	feedback_label.text = "AI started building %s in Slot %d." % [card_name, slot_index + 1]
+
+
+func _on_weapon_exploded(weapon_name: String, owner_player_number: int, explosion_damage: int) -> void:
+	feedback_label.text = "%s destroyed! Explosion dealt %d damage to Player %d mech." % [weapon_name, explosion_damage, owner_player_number]
 
 
 func _format_activation_interval(seconds: float) -> String:

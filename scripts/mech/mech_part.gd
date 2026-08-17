@@ -14,6 +14,8 @@ var current_health: int
 var activation_elapsed: float = 0.0
 var build_elapsed: float = 0.0
 var is_constructing: bool = true
+# Guards the match-level combat consequence; removal by Trash/reset never sets it.
+var combat_destruction_resolved: bool = false
 var target_type: int = TargetType.MAIN_MECH
 var target_slot_index: int = -1
 # Runtime identity is retained alongside the slot so removing a target and later
@@ -39,6 +41,13 @@ func apply_damage(amount: int) -> int:
 	if current_health <= 0:
 		destroyed.emit()
 	return applied
+
+
+func mark_combat_destruction_resolved() -> bool:
+	if combat_destruction_resolved or is_constructing or current_health > 0:
+		return false
+	combat_destruction_resolved = true
+	return true
 
 
 func advance_activation(delta: float) -> int:
