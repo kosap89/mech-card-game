@@ -12,17 +12,26 @@ enum MatchState { READY, ACTIVE, ENDED }
 
 @export var balance: BalanceConfig
 @export var test_deck: CardDeckDefinition
+@export var load_persisted_settings: bool = false
+@export var current_settings_path: String = BalanceSettingsStore.CURRENT_SETTINGS_PATH
 
 var player_1: PlayerState
 var player_2: PlayerState
 var match_state: int = MatchState.READY
 var result_text := ""
 var opponent_ai: SimpleOpponentAI
+var settings_store: BalanceSettingsStore
+var settings_paused: bool = false
 
 
 func _ready() -> void:
 	assert(balance != null, "MatchController requires a BalanceConfig resource.")
 	assert(test_deck != null, "MatchController requires a CardDeckDefinition resource.")
+	settings_store = BalanceSettingsStore.new(balance, test_deck)
+	if load_persisted_settings:
+		settings_store.load_current(current_settings_path)
+	balance = settings_store.runtime_balance
+	test_deck = settings_store.runtime_deck
 	player_1 = PlayerState.new(1, balance.mech_max_health, balance.starting_scrap, test_deck, balance.draw_interval_seconds)
 	player_2 = PlayerState.new(2, balance.mech_max_health, balance.starting_scrap, test_deck, balance.draw_interval_seconds)
 	player_2.mech.slots_changed.connect(_validate_player_1_weapon_targets)
@@ -32,7 +41,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if match_state != MatchState.ACTIVE:
+	if settings_paused or match_state != MatchState.ACTIVE:
 		return
 	_update_builtin_cannon(player_1, player_2, delta)
 	if match_state == MatchState.ACTIVE:
@@ -62,6 +71,27 @@ func start_match() -> void:
 
 func restart_match() -> void:
 	start_match()
+
+
+func set_settings_paused(paused: bool) -> void:
+	settings_paused = paused
+
+
+func apply_settings_snapshot(snapshot: Dictionary) -> bool:
+	settings_store.apply_snapshot(snapshot)
+	var saved := settings_store.save_current(current_settings_path)
+	_apply_runtime_configuration()
+	restart_match()
+	return saved
+
+
+func _apply_runtime_configuration() -> void:
+	for player in [player_1, player_2]:
+		player.starting_scrap = balance.starting_scrap
+		player.draw_interval_seconds = balance.draw_interval_seconds
+		player.deck_definition = test_deck
+		player.mech.max_health = balance.mech_max_health
+	opponent_ai.decision_interval_seconds = balance.ai_decision_interval_seconds
 
 
 func add_debug_scrap(player_number: int) -> void:

@@ -35,6 +35,8 @@ var battle_area: PanelContainer
 var player_area: PanelContainer
 var debug_panel: PanelContainer
 var restart_button: Button
+var settings_button: Button
+var settings_panel: BalanceSettingsPanel
 var selected_cards: Dictionary = {1: null, 2: null}
 var selected_weapon_slot: int = -1
 var selected_weapon_part: MechPart = null
@@ -58,6 +60,7 @@ func _ready() -> void:
 	match_controller.player_1_weapon_targets_changed.connect(_on_player_1_weapon_targets_changed)
 	match_controller.weapon_exploded.connect(_on_weapon_exploded)
 	_refresh()
+	_build_settings_editor()
 
 
 func _process(_delta: float) -> void:
@@ -79,9 +82,14 @@ func _build_placeholder_ui() -> void:
 	margin.add_child(root)
 	var header := HBoxContainer.new()
 	root.add_child(header)
-	var title := _label("MECH CARD GAME - PHASE 16 WEAPON EXPLOSIONS", 18)
+	var title := _label("MECH CARD GAME - PHASE 17 BALANCE EDITOR", 18)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
+	settings_button = Button.new()
+	settings_button.name = "BalanceSettingsButton"
+	settings_button.text = "Balance Settings"
+	settings_button.pressed.connect(_on_settings_pressed)
+	header.add_child(settings_button)
 	state_label = _label("", 14)
 	state_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	header.add_child(state_label)
@@ -297,6 +305,16 @@ func _build_debug_panel(parent: Control) -> void:
 	restart_button.text = "Restart / Play Again"
 	restart_button.pressed.connect(match_controller.restart_match)
 	buttons.add_child(restart_button)
+
+
+func _build_settings_editor() -> void:
+	settings_panel = BalanceSettingsPanel.new()
+	add_child(settings_panel)
+	settings_panel.setup(match_controller)
+
+
+func _on_settings_pressed() -> void:
+	settings_panel.open_editor()
 
 
 func _label(text_value: String, font_size: int) -> Label:
