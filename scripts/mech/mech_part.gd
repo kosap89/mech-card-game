@@ -16,6 +16,7 @@ var build_elapsed: float = 0.0
 var is_constructing: bool = true
 # Guards the match-level combat consequence; removal by Trash/reset never sets it.
 var combat_destruction_resolved: bool = false
+var needs_ai_target_assignment: bool = false
 var target_type: int = TargetType.MAIN_MECH
 var target_slot_index: int = -1
 # Runtime identity is retained alongside the slot so removing a target and later

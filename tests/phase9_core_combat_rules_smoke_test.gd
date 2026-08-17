@@ -99,6 +99,7 @@ func _new_controller() -> MatchController:
 func _test_phase9_ui() -> void:
 	var main_scene: Control = load("res://scenes/main/main.tscn").instantiate()
 	var controller: MatchController = main_scene.get_node("MatchController")
+	controller.load_persisted_settings = false
 	controller._ready()
 	controller.opponent_ai.enabled = false
 	main_scene.match_controller = controller

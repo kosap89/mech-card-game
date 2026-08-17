@@ -1,5 +1,8 @@
 extends Control
 
+const DAMAGE_FLASH_DURATION := 0.2
+const DAMAGE_FLASH_COLOR := Color(1.0, 0.35, 0.35, 1.0)
+
 @onready var match_controller: MatchController = $MatchController
 
 var state_label: Label
@@ -14,6 +17,7 @@ var p1_card_debug: Label
 var p1_selected_label: Label
 var p1_slot_buttons: Array[Button] = []
 var p1_trash_buttons: Array[Button] = []
+var p1_slot_panels: Array[PanelContainer] = []
 var p2_health: Label
 var p2_health_bar: ProgressBar
 var p2_mech_target_button: Button
@@ -25,6 +29,7 @@ var p2_card_debug: Label
 var p2_selected_label: Label
 var p2_slot_buttons: Array[Button] = []
 var p2_trash_buttons: Array[Button] = []
+var p2_slot_panels: Array[PanelContainer] = []
 var p1_hit_button: Button
 var p2_hit_button: Button
 var scrap_debug_buttons: Array[Button] = []
@@ -40,6 +45,7 @@ var settings_panel: BalanceSettingsPanel
 var selected_cards: Dictionary = {1: null, 2: null}
 var selected_weapon_slot: int = -1
 var selected_weapon_part: MechPart = null
+var damage_flash_remaining: Dictionary = {}
 
 
 func _ready() -> void:
@@ -59,14 +65,17 @@ func _ready() -> void:
 	match_controller.ai_card_played.connect(_on_ai_card_played)
 	match_controller.player_1_weapon_targets_changed.connect(_on_player_1_weapon_targets_changed)
 	match_controller.weapon_exploded.connect(_on_weapon_exploded)
+	match_controller.mech_damaged.connect(_on_mech_damaged)
+	match_controller.part_damaged.connect(_on_part_damaged)
 	_refresh()
 	_build_settings_editor()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if p1_builtin_cannon == null or p2_builtin_cannon == null:
 		return
 	_refresh_activation_displays()
+	_update_damage_flashes(delta)
 
 
 func _build_placeholder_ui() -> void:
@@ -134,6 +143,7 @@ func _build_enemy_area(parent: Control) -> void:
 	var slot_widgets := _build_slot_row(box, 2, false)
 	p2_slot_buttons.assign(slot_widgets[0])
 	p2_trash_buttons.assign(slot_widgets[1])
+	p2_slot_panels.assign(slot_widgets[2])
 
 
 func _build_battle_area(parent: Control) -> void:
@@ -169,6 +179,7 @@ func _build_player_area(parent: Control) -> void:
 	var slot_widgets := _build_slot_row(box, 1, true)
 	p1_slot_buttons.assign(slot_widgets[0])
 	p1_trash_buttons.assign(slot_widgets[1])
+	p1_slot_panels.assign(slot_widgets[2])
 	p1_builtin_cannon = _label("", 13)
 	var status := HBoxContainer.new()
 	box.add_child(status)
@@ -214,11 +225,13 @@ func _build_slot_row(parent: Control, player_number: int, show_trash: bool) -> A
 	parent.add_child(row)
 	var slot_buttons: Array[Button] = []
 	var trash_buttons: Array[Button] = []
+	var module_panels: Array[PanelContainer] = []
 	for index in MechState.SLOT_COUNT:
 		var module_panel := PanelContainer.new()
 		module_panel.custom_minimum_size = Vector2(0, 56 if not show_trash else 80)
 		module_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(module_panel)
+		module_panels.append(module_panel)
 		var module_box := VBoxContainer.new()
 		module_box.add_theme_constant_override("separation", 1)
 		module_panel.add_child(module_box)
@@ -239,7 +252,7 @@ func _build_slot_row(parent: Control, player_number: int, show_trash: bool) -> A
 		trash_button.disabled = not show_trash
 		module_box.add_child(trash_button)
 		trash_buttons.append(trash_button)
-	return [slot_buttons, trash_buttons]
+	return [slot_buttons, trash_buttons, module_panels]
 
 
 func _build_debug_panel(parent: Control) -> void:
@@ -368,6 +381,7 @@ func _on_damage_total_changed(_total: int) -> void:
 
 
 func _on_match_started() -> void:
+	_clear_damage_flashes()
 	selected_cards[1] = null
 	selected_cards[2] = null
 	_clear_weapon_selection()
@@ -513,8 +527,8 @@ func _refresh_player_slots(player: PlayerState, buttons: Array[Button], trash_bu
 		elif player.player_number == 2 and _selected_weapon_targets_enemy_slot(slot_index):
 			target_prefix = "[CURRENT TARGET] "
 		var target_text := ""
-		if player.player_number == 1 and part != null and not part.is_constructing:
-			target_text = " | Target: %s" % _get_weapon_target_text(part)
+		if part != null and not part.is_constructing:
+			target_text = " | Target: %s" % _get_weapon_target_text(part, player.player_number)
 		if part == null:
 			buttons[slot_index].text = "%sSLOT %d\nEMPTY" % [target_prefix, slot_index + 1]
 		elif part.is_constructing:
@@ -537,6 +551,48 @@ func _on_ai_card_played(card_name: String, slot_index: int) -> void:
 
 func _on_weapon_exploded(weapon_name: String, owner_player_number: int, explosion_damage: int) -> void:
 	feedback_label.text = "%s destroyed! Explosion dealt %d damage to Player %d mech." % [weapon_name, explosion_damage, owner_player_number]
+
+
+func _on_mech_damaged(player_number: int, amount: int) -> void:
+	if amount <= 0:
+		return
+	_flash_control(p1_health_bar if player_number == 1 else p2_health_bar)
+
+
+func _on_part_damaged(player_number: int, slot_index: int, amount: int) -> void:
+	if amount <= 0 or slot_index < 0 or slot_index >= MechState.SLOT_COUNT:
+		return
+	var panels := p1_slot_panels if player_number == 1 else p2_slot_panels
+	_flash_control(panels[slot_index])
+
+
+func _flash_control(control: Control) -> void:
+	if control == null:
+		return
+	control.modulate = DAMAGE_FLASH_COLOR
+	damage_flash_remaining[control] = DAMAGE_FLASH_DURATION
+
+
+func _update_damage_flashes(delta: float) -> void:
+	for control_value in damage_flash_remaining.keys():
+		var control: Control = control_value
+		if not is_instance_valid(control):
+			damage_flash_remaining.erase(control_value)
+			continue
+		var remaining: float = damage_flash_remaining[control] - maxf(0.0, delta)
+		if remaining <= 0.0:
+			control.modulate = Color.WHITE
+			damage_flash_remaining.erase(control)
+		else:
+			damage_flash_remaining[control] = remaining
+
+
+func _clear_damage_flashes() -> void:
+	for control_value in damage_flash_remaining:
+		var control: Control = control_value
+		if is_instance_valid(control):
+			control.modulate = Color.WHITE
+	damage_flash_remaining.clear()
 
 
 func _format_activation_interval(seconds: float) -> String:
@@ -583,14 +639,15 @@ func _selected_weapon_targets_enemy_slot(enemy_slot_index: int) -> bool:
 	return selected_weapon_part != null and not selected_weapon_part.is_constructing and selected_weapon_part.target_type == MechPart.TargetType.PART and selected_weapon_part.target_slot_index == enemy_slot_index
 
 
-func _get_weapon_target_text(weapon: MechPart) -> String:
+func _get_weapon_target_text(weapon: MechPart, owner_player_number: int = 1) -> String:
 	if weapon.target_type != MechPart.TargetType.PART:
-		return "Enemy Mech"
-	if match_controller.player_2.mech.is_valid_slot(weapon.target_slot_index):
-		var enemy_part: MechPart = match_controller.player_2.mech.slots[weapon.target_slot_index]
+		return "Enemy Mech" if owner_player_number == 1 else "Your Mech"
+	var defender := match_controller.player_2 if owner_player_number == 1 else match_controller.player_1
+	if defender.mech.is_valid_slot(weapon.target_slot_index):
+		var enemy_part: MechPart = defender.mech.slots[weapon.target_slot_index]
 		if enemy_part != null and not enemy_part.is_constructing and enemy_part == weapon.target_part:
-			return "%s (Enemy Slot %d)" % [enemy_part.card_data.display_name, weapon.target_slot_index + 1]
-	return "Enemy Mech"
+			return "%s (%s Slot %d)" % [enemy_part.card_data.display_name, "Enemy" if owner_player_number == 1 else "Your", weapon.target_slot_index + 1]
+	return "Enemy Mech" if owner_player_number == 1 else "Your Mech"
 
 
 func _clear_invalid_weapon_selection() -> void:

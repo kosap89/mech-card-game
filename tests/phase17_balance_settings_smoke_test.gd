@@ -119,6 +119,11 @@ func _test_settings_ui_and_pause() -> void:
 	_check(panel.game_controls.size() == BalanceSettingsStore.GAME_FIELDS.size(), "Game Settings expose every live non-debug balance field")
 	_check(panel.weapon_controls.size() == 10, "Weapon Settings enumerate all ten active definitions")
 	_check(panel.weapon_controls["light_cannon"].size() == 5, "Each weapon exposes Cost, Damage, HP, Fire Interval, and Build Time")
+	_check(_numeric_controls_are_wheel_safe(panel), "All Game and dynamically generated Weapon numeric rows reserve the mouse wheel for scrolling")
+	var wheel := InputEventMouseButton.new()
+	wheel.button_index = MOUSE_BUTTON_WHEEL_DOWN
+	wheel.pressed = true
+	_check(panel._is_mouse_wheel_event(wheel), "Balance editor recognizes vertical wheel input without consuming it")
 	var categories: TabContainer = panel.get_node("SettingsRoot/SettingsCategories")
 	_check(categories.get_child(0) is ScrollContainer and categories.get_child(1) is ScrollContainer, "Game and Weapon categories use independent scrolling views")
 	_check(panel.get_combined_minimum_size().x <= 1024.0 and panel.get_combined_minimum_size().y <= 640.0, "Settings editor minimum size remains usable near 1024x640")
@@ -133,6 +138,22 @@ func _test_settings_ui_and_pause() -> void:
 	controller._process(controller.balance.scrap_gain_interval_seconds)
 	_check(controller.player_1.current_scrap == scrap_before + controller.balance.scrap_gain_amount, "Closing settings safely resumes gameplay")
 	main_scene.free()
+
+
+func _numeric_controls_are_wheel_safe(panel: BalanceSettingsPanel) -> bool:
+	var all_spins: Array[SpinBox] = []
+	for spin: SpinBox in panel.game_controls.values():
+		all_spins.append(spin)
+	for controls: Dictionary in panel.weapon_controls.values():
+		for spin: SpinBox in controls.values():
+			all_spins.append(spin)
+	for spin in all_spins:
+		var slider := spin.get_parent().get_child(1) as HSlider
+		if slider == null or slider.scrollable:
+			return false
+		if not slider.mouse_force_pass_scroll_events or not spin.mouse_force_pass_scroll_events or not spin.get_line_edit().mouse_force_pass_scroll_events:
+			return false
+	return true
 
 
 func _new_controller(path: String, load_current: bool = false) -> MatchController:

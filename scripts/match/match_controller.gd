@@ -7,6 +7,8 @@ signal state_changed
 signal ai_card_played(card_name: String, slot_index: int)
 signal player_1_weapon_targets_changed
 signal weapon_exploded(weapon_name: String, owner_player_number: int, explosion_damage: int)
+signal mech_damaged(player_number: int, amount: int)
+signal part_damaged(player_number: int, slot_index: int, amount: int)
 
 enum MatchState { READY, ACTIVE, ENDED }
 
@@ -35,6 +37,7 @@ func _ready() -> void:
 	player_1 = PlayerState.new(1, balance.mech_max_health, balance.starting_scrap, test_deck, balance.draw_interval_seconds)
 	player_2 = PlayerState.new(2, balance.mech_max_health, balance.starting_scrap, test_deck, balance.draw_interval_seconds)
 	player_2.mech.slots_changed.connect(_validate_player_1_weapon_targets)
+	player_1.mech.slots_changed.connect(_validate_player_2_weapon_targets)
 	opponent_ai = SimpleOpponentAI.new(self, 2, balance.ai_decision_interval_seconds)
 	opponent_ai.card_played.connect(_on_ai_card_played)
 	start_match()
@@ -166,6 +169,8 @@ func apply_mech_damage(attacker: PlayerState, defender: PlayerState, amount: int
 	if match_state != MatchState.ACTIVE or attacker == null or defender == null or attacker == defender:
 		return 0
 	var applied := defender.mech.apply_damage(amount)
+	if applied > 0:
+		mech_damaged.emit(defender.player_number, applied)
 	attacker.record_mech_damage(applied)
 	if defender.mech.current_health <= 0:
 		end_match(attacker.player_number)
@@ -181,6 +186,8 @@ func apply_part_damage(attacker: PlayerState, defender: PlayerState, slot_index:
 	if part == null or part.is_constructing:
 		return 0
 	var applied := defender.mech.damage_part(slot_index, amount)
+	if applied > 0:
+		part_damaged.emit(defender.player_number, slot_index, applied)
 	if applied <= 0 or part.current_health > 0 or not part.mark_combat_destruction_resolved():
 		return applied
 	# Phase 16 temporary rule: an ACTIVE weapon explodes for its attack damage.
@@ -210,23 +217,23 @@ func _update_player_combat(attacker: PlayerState, defender: PlayerState, delta: 
 			var construction_remaining := part.get_build_remaining()
 			if not part.advance_construction(delta):
 				continue
+			if attacker == player_2:
+				part.needs_ai_target_assignment = true
+				opponent_ai.assign_weapon_target(part)
 			# Only real time after completion can advance the fresh activation timer.
 			activation_delta = maxf(0.0, delta - construction_remaining)
 		var activation_count := part.advance_activation(activation_delta)
 		for activation_index in activation_count:
 			if match_state != MatchState.ACTIVE:
 				return
-			if attacker == player_1:
-				_apply_player_1_installed_weapon_damage(part, part.card_data.damage)
-			else:
-				apply_mech_damage(attacker, defender, part.card_data.damage)
+			_apply_installed_weapon_damage(attacker, defender, part, part.card_data.damage)
 
 
-func _apply_player_1_installed_weapon_damage(weapon: MechPart, amount: int) -> int:
-	_validate_player_1_weapon_target(weapon)
+func _apply_installed_weapon_damage(attacker: PlayerState, defender: PlayerState, weapon: MechPart, amount: int) -> int:
+	_validate_weapon_target(weapon, defender)
 	if weapon.target_type == MechPart.TargetType.PART:
-		return apply_part_damage(player_1, player_2, weapon.target_slot_index, amount)
-	return apply_mech_damage(player_1, player_2, amount)
+		return apply_part_damage(attacker, defender, weapon.target_slot_index, amount)
+	return apply_mech_damage(attacker, defender, amount)
 
 
 func _validate_player_1_weapon_targets() -> void:
@@ -240,17 +247,39 @@ func _validate_player_1_weapon_targets() -> void:
 		player_1_weapon_targets_changed.emit()
 
 
+func _validate_player_2_weapon_targets() -> void:
+	for slot_value in player_2.mech.slots:
+		var weapon: MechPart = slot_value
+		if weapon != null and not _is_weapon_target_valid(weapon, player_1):
+			weapon.target_main_mech()
+			weapon.needs_ai_target_assignment = true
+
+
 func _validate_player_1_weapon_target(weapon: MechPart) -> void:
-	if _is_player_1_weapon_target_valid(weapon):
+	if _is_weapon_target_valid(weapon, player_2):
 		return
 	weapon.target_main_mech()
 	player_1_weapon_targets_changed.emit()
 
 
 func _is_player_1_weapon_target_valid(weapon: MechPart) -> bool:
+	return _is_weapon_target_valid(weapon, player_2)
+
+
+func _validate_weapon_target(weapon: MechPart, defender: PlayerState) -> void:
+	if _is_weapon_target_valid(weapon, defender):
+		return
+	weapon.target_main_mech()
+	if weapon.owner == player_2:
+		weapon.needs_ai_target_assignment = true
+	else:
+		player_1_weapon_targets_changed.emit()
+
+
+func _is_weapon_target_valid(weapon: MechPart, defender: PlayerState) -> bool:
 	if weapon == null or weapon.target_type == MechPart.TargetType.MAIN_MECH:
 		return true
-	return player_2.mech.is_valid_slot(weapon.target_slot_index) and player_2.mech.slots[weapon.target_slot_index] == weapon.target_part and not weapon.target_part.is_constructing
+	return defender.mech.is_valid_slot(weapon.target_slot_index) and defender.mech.slots[weapon.target_slot_index] == weapon.target_part and not weapon.target_part.is_constructing
 
 
 func _get_player_1_weapon(slot_index: int) -> MechPart:

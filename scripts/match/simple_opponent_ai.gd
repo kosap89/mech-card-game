@@ -36,6 +36,10 @@ func _take_one_decision() -> bool:
 	var player := match_controller.get_player(player_number)
 	if player == null:
 		return false
+	for part_value in player.mech.slots:
+		var part: MechPart = part_value
+		if part != null and not part.is_constructing and part.needs_ai_target_assignment:
+			assign_weapon_target(part)
 	var playable_cards: Array[CardData] = []
 	for card in player.hand:
 		if not _valid_slots_for_card(player, card).is_empty():
@@ -49,6 +53,24 @@ func _take_one_decision() -> bool:
 	if result != PlayerState.PlayPartResult.SUCCESS:
 		return false
 	card_played.emit(selected_card.display_name, slot_index)
+	return true
+
+
+func assign_weapon_target(weapon: MechPart) -> bool:
+	if weapon == null or weapon.owner.player_number != player_number or weapon.is_constructing:
+		return false
+	var defender := match_controller.player_1
+	var choices: Array[int] = [-1]
+	for slot_index in MechState.SLOT_COUNT:
+		var target: MechPart = defender.mech.slots[slot_index]
+		if target != null and not target.is_constructing:
+			choices.append(slot_index)
+	var choice := choices[random.randi_range(0, choices.size() - 1)]
+	if choice < 0:
+		weapon.target_main_mech()
+	else:
+		weapon.target_enemy_part(choice, defender.mech.slots[choice])
+	weapon.needs_ai_target_assignment = false
 	return true
 
 

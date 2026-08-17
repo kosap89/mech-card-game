@@ -51,6 +51,16 @@ func close_editor() -> void:
 	match_controller.set_settings_paused(false)
 
 
+func _input(event: InputEvent) -> void:
+	if not visible or not _is_mouse_wheel_event(event):
+		return
+	var focus_owner := get_viewport().gui_get_focus_owner()
+	if focus_owner is LineEdit and focus_owner.get_parent() is SpinBox and is_ancestor_of(focus_owner):
+		# SpinBox consumes wheel input only while its LineEdit is editing. Ending
+		# that edit here leaves the wheel event unhandled for the ScrollContainer.
+		focus_owner.release_focus()
+
+
 func get_editor_snapshot() -> Dictionary:
 	return _collect_snapshot()
 
@@ -170,6 +180,8 @@ func _add_numeric_row(parent: Control, label_text: String, minimum: float, maxim
 	slider.min_value = minimum
 	slider.max_value = maximum
 	slider.step = step
+	slider.scrollable = false
+	slider.mouse_force_pass_scroll_events = true
 	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(slider)
 	var spin := SpinBox.new()
@@ -177,11 +189,19 @@ func _add_numeric_row(parent: Control, label_text: String, minimum: float, maxim
 	spin.max_value = maximum
 	spin.step = step
 	spin.suffix = suffix
+	spin.mouse_force_pass_scroll_events = true
+	spin.get_line_edit().mouse_force_pass_scroll_events = true
 	spin.custom_minimum_size.x = 130
 	row.add_child(spin)
 	slider.value_changed.connect(func(value: float) -> void: spin.value = value)
 	spin.value_changed.connect(func(value: float) -> void: slider.value = value)
 	return spin
+
+
+func _is_mouse_wheel_event(event: InputEvent) -> bool:
+	if not event is InputEventMouseButton:
+		return false
+	return event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN
 
 
 func _populate_controls(snapshot: Dictionary) -> void:
