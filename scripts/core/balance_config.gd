@@ -9,7 +9,7 @@ extends Resource
 @export_range(1, 100000, 1) var builtin_cannon_damage: int = 10
 @export_range(0.1, 3600.0, 0.1) var builtin_cannon_activation_interval_seconds: float = 3.0
 
-# TODO(game design): Define the final Scrap return formula for Trash and Replace.
+# TODO(game design): Define the final Scrap return formula for Trash.
 @export_range(0.0, 1.0, 0.05) var scrap_return_fraction: float = 0.5
 
 # Temporary MVP Scrap values. These are subject to gameplay balancing.

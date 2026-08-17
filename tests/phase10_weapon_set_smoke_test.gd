@@ -33,6 +33,7 @@ func _init() -> void:
 		_check(card.display_name == expected[0] and card.cost == expected[1] and card.max_health == expected[2] and card.damage == expected[3] and is_equal_approx(card.activation_interval, expected[4]), "%s has the specified Phase 10 values" % card.display_name)
 		_check(not card.id.is_empty() and not card.display_name.is_empty(), "%s has valid identity data" % card_id)
 		_check(card.cost > 0 and card.max_health > 0 and card.damage > 0 and card.activation_interval > 0.0, "%s has positive weapon stats" % card.display_name)
+		_check(card.build_time > 0.0, "%s has a positive construction time" % card.display_name)
 		_check(controller.test_deck.cards.count(card) == 2, "%s appears exactly twice by shared reference" % card.display_name)
 	for card in controller.test_deck.cards:
 		_check(card.display_name not in INACTIVE_NAMES, "%s is not an active placeholder" % card.display_name)
@@ -42,22 +43,22 @@ func _init() -> void:
 	var light: CardData = definitions[&"light_cannon"]
 	var heavy: CardData = definitions[&"heavy_cannon"]
 	var autocannon: CardData = definitions[&"autocannon"]
-	controller.player_1.mech.install_part(MechPart.new(light, controller.player_1, 0), 0)
-	controller.player_1.mech.install_part(MechPart.new(autocannon, controller.player_1, 1), 1)
+	controller.player_1.mech.install_part(_active_part(light, controller.player_1, 0), 0)
+	controller.player_1.mech.install_part(_active_part(autocannon, controller.player_1, 1), 1)
 	controller._process(1.0)
 	_check(controller.player_1.total_mech_damage_dealt == autocannon.damage, "Autocannon fires at its own interval")
 	controller._process(1.0)
 	_check(controller.player_1.total_mech_damage_dealt == autocannon.damage * 2 + light.damage, "Different weapons fire independently")
 
 	controller.restart_match()
-	controller.player_1.mech.install_part(MechPart.new(heavy, controller.player_1, 0), 0)
+	controller.player_1.mech.install_part(_active_part(heavy, controller.player_1, 0), 0)
 	controller._process(heavy.activation_interval)
 	_check(controller.player_1.total_mech_damage_dealt == heavy.damage, "Heavy Cannon deals its configured automatic damage")
 
 	for card_id in EXPECTED_WEAPONS:
 		controller.restart_match()
 		var card: CardData = definitions[card_id]
-		controller.player_1.mech.install_part(MechPart.new(card, controller.player_1, 0), 0)
+		controller.player_1.mech.install_part(_active_part(card, controller.player_1, 0), 0)
 		var expected_return := ceili(card.cost * controller.balance.scrap_return_fraction)
 		_check(controller.try_trash_part(1, 0) == PlayerState.TrashPartResult.SUCCESS, "%s can be Trashed" % card.display_name)
 		_check(controller.player_1.current_scrap == expected_return and controller.player_1.mech.slots[0] == null, "%s Trash returns whole Scrap and empties its slot" % card.display_name)
@@ -66,10 +67,9 @@ func _init() -> void:
 	var old_part := MechPart.new(light, controller.player_1, 0)
 	controller.player_1.mech.install_part(old_part, 0)
 	controller.player_1.hand.append(heavy)
-	controller.player_1.current_scrap = heavy.cost - ceili(light.cost * controller.balance.scrap_return_fraction)
-	_check(controller.try_play_card(1, heavy, 0) == PlayerState.PlayPartResult.REPLACED, "Replace works between different weapon types")
-	var replaced_part: MechPart = controller.player_1.mech.slots[0]
-	_check(replaced_part != old_part and replaced_part.card_data == heavy and replaced_part.current_health == heavy.max_health and is_zero_approx(replaced_part.activation_elapsed), "Replace creates fresh Heavy Cannon runtime state")
+	controller.player_1.current_scrap = heavy.cost
+	_check(controller.try_play_card(1, heavy, 0) == PlayerState.PlayPartResult.SLOT_OCCUPIED, "Occupied slots reject a different weapon")
+	_check(controller.player_1.mech.slots[0] == old_part and heavy in controller.player_1.hand and controller.player_1.current_scrap == heavy.cost, "Occupied-slot rejection is atomic")
 
 	controller.restart_match()
 	controller.opponent_ai.enabled = true
@@ -128,12 +128,19 @@ func _test_ui_stats() -> void:
 	var card_text: String = main_scene.p1_hand_container.get_child(0).text
 	_check("Cost:" in card_text and "DMG:" in card_text and "Fire:" in card_text and "HP:" in card_text, "Hand cards display all required weapon stats")
 	var light: CardData = load("res://data/cards/light_cannon.tres")
-	controller.player_1.mech.install_part(MechPart.new(light, controller.player_1, 0), 0)
+	controller.player_1.mech.install_part(_active_part(light, controller.player_1, 0), 0)
+	main_scene._process(0.0)
 	var slot_text: String = main_scene.p1_slot_buttons[0].text
-	_check("Light Cannon" in slot_text and "HP:" in slot_text and "DMG:" in slot_text and "Fire:" in slot_text, "Installed slots display all required weapon stats")
+	_check("Light Cannon" in slot_text and "HP " in slot_text and "DMG " in slot_text and "Fire " in slot_text, "Installed slots display all required weapon stats")
 	main_scene.free()
 
 
 func _check(condition: bool, message: String) -> void:
 	if not condition:
 		failures.append(message)
+
+
+func _active_part(card: CardData, player: PlayerState, slot_index: int) -> MechPart:
+	var part := MechPart.new(card, player, slot_index)
+	part.advance_construction(card.build_time)
+	return part

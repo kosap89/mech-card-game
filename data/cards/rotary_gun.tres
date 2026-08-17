@@ -8,3 +8,4 @@ cost = 4
 max_health = 50
 damage = 5
 activation_interval = 0.75
+build_time = 2.0

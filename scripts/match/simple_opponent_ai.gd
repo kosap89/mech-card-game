@@ -1,7 +1,7 @@
 class_name SimpleOpponentAI
 extends RefCounted
 
-signal card_played(card_name: String, slot_index: int, replaced: bool, old_part_name: String)
+signal card_played(card_name: String, slot_index: int)
 
 var match_controller: MatchController
 var player_number: int
@@ -45,12 +45,10 @@ func _take_one_decision() -> bool:
 	var selected_card := playable_cards[random.randi_range(0, playable_cards.size() - 1)]
 	var valid_slots := _valid_slots_for_card(player, selected_card)
 	var slot_index: int = valid_slots[random.randi_range(0, valid_slots.size() - 1)]
-	var old_part: MechPart = player.mech.slots[slot_index]
-	var old_part_name := "" if old_part == null else old_part.card_data.display_name
 	var result := match_controller.try_play_card(player_number, selected_card, slot_index)
-	if result not in [PlayerState.PlayPartResult.SUCCESS, PlayerState.PlayPartResult.REPLACED]:
+	if result != PlayerState.PlayPartResult.SUCCESS:
 		return false
-	card_played.emit(selected_card.display_name, slot_index, result == PlayerState.PlayPartResult.REPLACED, old_part_name)
+	card_played.emit(selected_card.display_name, slot_index)
 	return true
 
 
@@ -59,13 +57,9 @@ func _valid_slots_for_card(player: PlayerState, card: CardData) -> Array[int]:
 	for slot_index in MechState.SLOT_COUNT:
 		if player.mech.is_slot_empty(slot_index):
 			empty_slots.append(slot_index)
-	var candidate_slots: Array[int] = empty_slots
-	if candidate_slots.is_empty():
-		for slot_index in MechState.SLOT_COUNT:
-			candidate_slots.append(slot_index)
 	var valid_slots: Array[int] = []
-	for slot_index in candidate_slots:
-		var result := player.validate_play_part(card, slot_index, match_controller.balance.scrap_return_fraction)
-		if result in [PlayerState.PlayPartResult.SUCCESS, PlayerState.PlayPartResult.REPLACED]:
+	for slot_index in empty_slots:
+		var result := player.validate_play_part(card, slot_index)
+		if result == PlayerState.PlayPartResult.SUCCESS:
 			valid_slots.append(slot_index)
 	return valid_slots

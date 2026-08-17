@@ -28,6 +28,7 @@ func _init() -> void:
 	var installed_part: MechPart = player.mech.slots[0]
 	_check(installed_part != null and installed_part.card_data == first_card, "Installed part retains its CardData reference")
 	_check(installed_part.owner == player and installed_part.slot_index == 0, "Installed part retains owner and slot")
+	_check(installed_part.is_constructing, "A successfully played weapon begins construction")
 
 	controller.restart_match()
 	player = controller.player_1
@@ -44,14 +45,14 @@ func _init() -> void:
 	var occupied_card: CardData = player.hand[0]
 	_check(controller.try_play_card(1, occupied_card, 2) == PlayerState.PlayPartResult.SUCCESS, "Test setup installs into an empty slot")
 	var existing_part: MechPart = player.mech.slots[2]
-	var replacement_card: CardData = player.hand[0]
+	var blocked_card: CardData = player.hand[0]
 	initial_hand_size = player.hand.size()
 	scrap_before = player.current_scrap
-	result = controller.try_play_card(1, replacement_card, 2)
-	_check(result == PlayerState.PlayPartResult.REPLACED, "Occupied slot uses Phase 7 Replace")
-	_check(player.mech.slots[2] != existing_part and player.mech.slots[2].card_data == replacement_card, "Replace installs a fresh part")
-	_check(player.hand.size() == initial_hand_size - 1 and player.hand.find(replacement_card) < 0, "Replace removes the selected card")
-	_check(player.current_scrap <= scrap_before + existing_part.card_data.cost * controller.balance.scrap_return_fraction, "Replace applies return and new cost")
+	result = controller.try_play_card(1, blocked_card, 2)
+	_check(result == PlayerState.PlayPartResult.SLOT_OCCUPIED, "Occupied slot rejects another card")
+	_check(player.mech.slots[2] == existing_part, "Occupied-slot rejection preserves the installed weapon")
+	_check(player.hand.size() == initial_hand_size and player.hand.find(blocked_card) >= 0, "Occupied-slot rejection preserves the selected card")
+	_check(player.current_scrap == scrap_before, "Occupied-slot rejection preserves Scrap")
 
 	var player_1_card: CardData = player.hand[0]
 	var player_2_hand_size := controller.player_2.hand.size()

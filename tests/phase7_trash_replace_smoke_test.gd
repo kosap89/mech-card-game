@@ -42,13 +42,10 @@ func _init() -> void:
 	player.current_scrap = 1
 	player.hand.append(cannon)
 	var hand_size := player.hand.size()
-	var cannon_copies_before := player.hand.count(cannon)
 	var result := controller.try_play_card(1, cannon, 0)
-	_check(result == PlayerState.PlayPartResult.REPLACED, "Replace can use returned Scrap toward new card cost")
-	_check(player.mech.slots[0] != old_part and player.mech.slots[0].card_data == cannon, "Replace swaps the part in the same slot")
-	_check(absf(player.current_scrap) < EPSILON, "Replace applies return then charges normal new-card cost")
-	_check(player.hand.size() == hand_size - 1 and player.hand.count(cannon) == cannon_copies_before - 1, "Replace removes exactly one selected-card entry")
-	_check(player.mech.slots[0].current_health == cannon.max_health and is_zero_approx(player.mech.slots[0].activation_elapsed), "Replacement part starts with fresh Health and activation state")
+	_check(result == PlayerState.PlayPartResult.SLOT_OCCUPIED, "Occupied slot rejects card play even when Scrap return could have covered the cost")
+	_check(player.mech.slots[0] == old_part, "Occupied-slot rejection preserves the installed part")
+	_check(player.current_scrap == 1 and player.hand.size() == hand_size, "Occupied-slot rejection preserves Scrap and hand state")
 
 	controller.restart_match()
 	player = controller.player_1
@@ -59,10 +56,10 @@ func _init() -> void:
 	hand_size = player.hand.size()
 	scrap_before = player.current_scrap
 	result = controller.try_play_card(1, expensive_card, 0)
-	_check(result == PlayerState.PlayPartResult.NOT_ENOUGH_SCRAP, "Unaffordable Replace fails")
-	_check(player.mech.slots[0] == old_part, "Failed Replace preserves old part")
-	_check(player.hand.size() == hand_size and player.hand.find(expensive_card) >= 0, "Failed Replace preserves new card")
-	_check(absf(player.current_scrap - scrap_before) < EPSILON, "Failed Replace preserves Scrap")
+	_check(result == PlayerState.PlayPartResult.SLOT_OCCUPIED, "Occupied-slot validation takes priority without using Scrap")
+	_check(player.mech.slots[0] == old_part, "Blocked occupied-slot play preserves old part")
+	_check(player.hand.size() == hand_size and player.hand.find(expensive_card) >= 0, "Blocked occupied-slot play preserves new card")
+	_check(absf(player.current_scrap - scrap_before) < EPSILON, "Blocked occupied-slot play preserves Scrap")
 
 	controller.restart_match()
 	player = controller.player_1
@@ -80,7 +77,7 @@ func _init() -> void:
 	_check(player.mech.slots[1] != null and absf(player.current_scrap - scrap_before) < EPSILON, "Blocked Trash changes no state")
 
 	controller.restart_match()
-	_check(_all_slots_empty(controller.player_1.mech) and _all_slots_empty(controller.player_2.mech), "Restart clears Trash and Replace runtime state")
+	_check(_all_slots_empty(controller.player_1.mech) and _all_slots_empty(controller.player_2.mech), "Restart clears Trash and weapon runtime state")
 	controller.free()
 
 	if failures.is_empty():
@@ -105,6 +102,7 @@ func _new_controller() -> MatchController:
 func _install_test_part(player: PlayerState, card: CardData, slot_index: int) -> MechPart:
 	var part := MechPart.new(card, player, slot_index)
 	_check(player.mech.install_part(part, slot_index), "Test part installs in empty slot")
+	part.advance_construction(card.build_time)
 	return part
 
 

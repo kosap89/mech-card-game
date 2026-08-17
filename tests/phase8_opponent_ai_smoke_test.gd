@@ -46,13 +46,14 @@ func _init() -> void:
 		var plays_before := ai_play_count
 		ai.advance(controller.balance.ai_decision_interval_seconds)
 		_check(ai_play_count == plays_before + 1, "AI makes at most one successful play per decision cycle")
-	_check(_occupied_slot_count(player.mech) == MechState.SLOT_COUNT, "AI fills all four empty slots before replacing")
+	_check(_occupied_slot_count(player.mech) == MechState.SLOT_COUNT, "AI fills all four empty slots")
 	var old_parts := player.mech.slots.duplicate()
-	var hand_size_before_replace := player.hand.size()
+	var hand_size_when_full := player.hand.size()
+	var plays_when_full := ai_play_count
 	ai.advance(controller.balance.ai_decision_interval_seconds)
-	_check(ai_play_count >= 5 and _occupied_slot_count(player.mech) == MechState.SLOT_COUNT, "AI uses Replace after all slots are full")
-	_check(_slot_was_replaced(player.mech, old_parts), "AI Replace removes an old part and installs a fresh part")
-	_check(player.hand.size() == hand_size_before_replace - 1 and player.current_scrap >= 0, "AI Replace uses normal hand and nonnegative Scrap state")
+	_check(ai_play_count == plays_when_full and _occupied_slot_count(player.mech) == MechState.SLOT_COUNT, "AI waits when all four slots are occupied")
+	_check(player.mech.slots == old_parts, "AI never replaces an occupied slot")
+	_check(player.hand.size() == hand_size_when_full and player.current_scrap >= 0, "Full-slot AI wait preserves hand and Scrap")
 
 	controller.end_match()
 	hand_before = player.hand.size()
@@ -102,7 +103,7 @@ func _test_player_2_ui_is_read_only() -> void:
 	main_scene.free()
 
 
-func _on_ai_card_played(_card_name: String, _slot_index: int, _replaced: bool, _old_part_name: String) -> void:
+func _on_ai_card_played(_card_name: String, _slot_index: int) -> void:
 	ai_play_count += 1
 
 
@@ -112,13 +113,6 @@ func _occupied_slot_count(mech: MechState) -> int:
 		if part != null:
 			count += 1
 	return count
-
-
-func _slot_was_replaced(mech: MechState, old_parts: Array) -> bool:
-	for slot_index in MechState.SLOT_COUNT:
-		if mech.slots[slot_index] != old_parts[slot_index]:
-			return true
-	return false
 
 
 func _check(condition: bool, message: String) -> void:

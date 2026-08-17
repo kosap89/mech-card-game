@@ -15,6 +15,8 @@ func _init() -> void:
 	var weapon_b := MechPart.new(light, controller.player_1, 1)
 	var enemy_a := MechPart.new(heavy, controller.player_2, 0)
 	var enemy_b := MechPart.new(heavy, controller.player_2, 1)
+	for part in [weapon_a, weapon_b, enemy_a, enemy_b]:
+		part.advance_construction(part.card_data.build_time)
 	controller.player_1.mech.install_part(weapon_a, 0)
 	controller.player_1.mech.install_part(weapon_b, 1)
 	controller.player_2.mech.install_part(enemy_a, 0)
@@ -34,14 +36,17 @@ func _init() -> void:
 	_check(weapon_a.target_type == MechPart.TargetType.MAIN_MECH and weapon_b.target_part == enemy_b, "Destroying one target resets only affected weapons")
 	controller.player_2.hand.append(light)
 	controller.player_2.current_scrap = light.cost
-	_check(controller.try_play_card(2, light, 1) == PlayerState.PlayPartResult.REPLACED, "AI gameplay path can replace a targeted slot")
-	_check(weapon_b.target_type == MechPart.TargetType.MAIN_MECH, "AI Replace invalidates affected individual targets")
+	_check(controller.try_play_card(2, light, 1) == PlayerState.PlayPartResult.SLOT_OCCUPIED, "AI gameplay path cannot build into a targeted occupied slot")
+	_check(weapon_b.target_part == enemy_b, "Rejected occupied-slot play preserves individual targets")
 
 	controller.player_1.hand.append(heavy)
 	controller.player_1.current_scrap = heavy.cost
-	_check(controller.try_play_card(1, heavy, 0) == PlayerState.PlayPartResult.REPLACED, "Player 1 Replace remains available")
+	_check(controller.try_play_card(1, heavy, 0) == PlayerState.PlayPartResult.SLOT_OCCUPIED, "Player 1 cannot build into an occupied slot")
+	_check(controller.player_1.mech.slots[0] == weapon_a, "Rejected occupied-slot play preserves the installed weapon")
+	controller.try_trash_part(1, 0)
+	_check(controller.try_play_card(1, heavy, 0) == PlayerState.PlayPartResult.SUCCESS, "Player 1 can build after explicitly Trashing the slot")
 	var replacement: MechPart = controller.player_1.mech.slots[0]
-	_check(replacement != weapon_a and replacement.target_type == MechPart.TargetType.MAIN_MECH and replacement.target_slot_index == -1, "Replacement weapon receives a fresh main-mech target")
+	_check(replacement != weapon_a and replacement.is_constructing and replacement.target_type == MechPart.TargetType.MAIN_MECH, "New construction receives fresh runtime target state")
 	controller.restart_match()
 	_check(controller.player_1.mech.slots.all(func(part) -> bool: return part == null), "Restart removes all runtime weapon target state")
 	controller.free()
@@ -75,6 +80,8 @@ func _test_ui_interaction(light: CardData, heavy: CardData) -> void:
 	var weapon_a := MechPart.new(light, controller.player_1, 0)
 	var weapon_b := MechPart.new(light, controller.player_1, 1)
 	var enemy_part := MechPart.new(heavy, controller.player_2, 0)
+	for part in [weapon_a, weapon_b, enemy_part]:
+		part.advance_construction(part.card_data.build_time)
 	controller.player_1.mech.install_part(weapon_a, 0)
 	controller.player_1.mech.install_part(weapon_b, 1)
 	controller.player_2.mech.install_part(enemy_part, 0)
@@ -92,7 +99,7 @@ func _test_ui_interaction(light: CardData, heavy: CardData) -> void:
 	controller.player_1.current_scrap = 100
 	var old_weapon: MechPart = controller.player_1.mech.slots[0]
 	main_scene.p1_slot_buttons[0].pressed.emit()
-	_check(controller.player_1.mech.slots[0] != old_weapon and main_scene.selected_cards[1] == null, "Selected hand card gives Replace priority over weapon selection")
+	_check(controller.player_1.mech.slots[0] == old_weapon and main_scene.selected_cards[1] != null, "Selected hand card cannot replace an occupied weapon")
 	var stable_hand_button: Button = main_scene.p1_hand_container.get_child(0)
 	controller._process(0.25)
 	main_scene._process(0.0)
@@ -100,11 +107,11 @@ func _test_ui_interaction(light: CardData, heavy: CardData) -> void:
 	main_scene.p1_slot_buttons[1].pressed.emit()
 	main_scene.p1_trash_buttons[1].pressed.emit()
 	_check(main_scene.selected_weapon_slot == -1 and controller.player_1.mech.slots[1] == null, "Trashing the selected own weapon clears temporary target selection")
-	controller.player_1.mech.install_part(MechPart.new(light, controller.player_1, 1), 1)
+	controller.player_1.mech.install_part(_active_part(light, controller.player_1, 1), 1)
 	main_scene.p1_slot_buttons[1].pressed.emit()
 	controller.damage_debug_part(1, 1, light.max_health)
 	_check(main_scene.selected_weapon_slot == -1 and controller.player_1.mech.slots[1] == null, "Destroying the selected own weapon clears temporary target selection")
-	controller.player_1.mech.install_part(MechPart.new(light, controller.player_1, 1), 1)
+	controller.player_1.mech.install_part(_active_part(light, controller.player_1, 1), 1)
 	main_scene.p1_slot_buttons[1].pressed.emit()
 	controller.end_match()
 	_check(main_scene.selected_weapon_slot == -1 and main_scene.p1_slot_buttons[1].disabled and main_scene.p2_slot_buttons[0].disabled, "Match end clears temporary selection and disables targeting")
@@ -114,3 +121,9 @@ func _test_ui_interaction(light: CardData, heavy: CardData) -> void:
 func _check(condition: bool, message: String) -> void:
 	if not condition:
 		failures.append(message)
+
+
+func _active_part(card: CardData, player: PlayerState, slot_index: int) -> MechPart:
+	var part := MechPart.new(card, player, slot_index)
+	part.advance_construction(card.build_time)
+	return part

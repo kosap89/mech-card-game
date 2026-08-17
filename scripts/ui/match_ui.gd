@@ -78,7 +78,7 @@ func _build_placeholder_ui() -> void:
 	margin.add_child(root)
 	var header := HBoxContainer.new()
 	root.add_child(header)
-	var title := _label("MECH CARD GAME - PHASE 14 PER-WEAPON TARGETING", 18)
+	var title := _label("MECH CARD GAME - PHASE 15 WEAPON CONSTRUCTION", 18)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
 	state_label = _label("", 14)
@@ -143,7 +143,7 @@ func _build_battle_area(parent: Control) -> void:
 	result_label.custom_minimum_size.y = 24
 	result_label.clip_text = true
 	box.add_child(result_label)
-	feedback_label = _label("Select a card, then select an empty or occupied Player 1 slot.", 13)
+	feedback_label = _label("Select a card, then select an empty Player 1 slot.", 13)
 	feedback_label.custom_minimum_size.y = 20
 	feedback_label.clip_text = true
 	box.add_child(feedback_label)
@@ -392,24 +392,24 @@ func _on_slot_pressed(player_number: int, slot_index: int) -> void:
 		if own_part == null:
 			feedback_label.text = "Select a card before clicking an empty slot."
 			return
+		if own_part.is_constructing:
+			feedback_label.text = "This weapon is still building and cannot select a target."
+			return
 		selected_weapon_slot = slot_index
 		selected_weapon_part = own_part
 		feedback_label.text = "Select a target for %s." % own_part.card_data.display_name
 		_refresh_slots()
 		_refresh_target_presentation()
 		return
-	var old_part: MechPart = match_controller.get_player(player_number).mech.slots[slot_index]
-	var old_part_name := "" if old_part == null else old_part.card_data.display_name
 	var result := match_controller.try_play_card(player_number, card, slot_index)
 	match result:
 		PlayerState.PlayPartResult.SUCCESS:
-			feedback_label.text = "%s installed in Player %d Slot %d." % [card.display_name, player_number, slot_index + 1]
+			feedback_label.text = "%s construction started in Player %d Slot %d." % [card.display_name, player_number, slot_index + 1]
 			selected_cards[player_number] = null
-		PlayerState.PlayPartResult.REPLACED:
-			feedback_label.text = "Replaced %s with %s." % [old_part_name, card.display_name]
-			selected_cards[player_number] = null
+		PlayerState.PlayPartResult.SLOT_OCCUPIED:
+			feedback_label.text = "Slot occupied. Trash the weapon first."
 		PlayerState.PlayPartResult.NOT_ENOUGH_SCRAP:
-			feedback_label.text = "Not enough Scrap to install or replace this part."
+			feedback_label.text = "Not enough Scrap to build this weapon."
 		PlayerState.PlayPartResult.INVALID_SLOT:
 			feedback_label.text = "Invalid mech slot."
 		PlayerState.PlayPartResult.NOT_A_PART:
@@ -466,7 +466,7 @@ func _refresh_player_cards(player: PlayerState, container: HBoxContainer, debug_
 	for card in player.hand:
 		var card_display := Button.new()
 		var selected: bool = selected_cards[player.player_number] == card
-		card_display.text = "%s%s\nCost: %d | DMG: %d | HP: %d\nFire: %ss" % ["[SELECTED] " if selected else "", card.display_name, card.cost, card.damage, card.max_health, _format_activation_interval(card.activation_interval)]
+		card_display.text = "%s%s\nCost: %d | DMG: %d | HP: %d\nFire: %ss | Build: %ss" % ["[SELECTED] " if selected else "", card.display_name, card.cost, card.damage, card.max_health, _format_activation_interval(card.activation_interval), _format_activation_interval(card.build_time)]
 		card_display.disabled = match_controller.match_state != MatchController.MatchState.ACTIVE or player.player_number != 1
 		card_display.pressed.connect(_on_card_pressed.bind(player.player_number, card))
 		card_display.custom_minimum_size = Vector2(150, 62)
@@ -494,10 +494,15 @@ func _refresh_player_slots(player: PlayerState, buttons: Array[Button], trash_bu
 		elif player.player_number == 2 and _selected_weapon_targets_enemy_slot(slot_index):
 			target_prefix = "[CURRENT TARGET] "
 		var target_text := ""
-		if player.player_number == 1 and part != null:
+		if player.player_number == 1 and part != null and not part.is_constructing:
 			target_text = " | Target: %s" % _get_weapon_target_text(part)
-		buttons[slot_index].text = "%sSLOT %d\nEMPTY" % [target_prefix, slot_index + 1] if part == null else "%sSLOT %d - %s\nDMG %d | HP %d/%d | Fire %ss\nNext: %.1fs%s" % [target_prefix, slot_index + 1, part.card_data.display_name, part.card_data.damage, part.current_health, part.max_health, _format_activation_interval(part.card_data.activation_interval), part.get_activation_remaining(), target_text]
-		buttons[slot_index].disabled = not active or (not human_controlled and part == null)
+		if part == null:
+			buttons[slot_index].text = "%sSLOT %d\nEMPTY" % [target_prefix, slot_index + 1]
+		elif part.is_constructing:
+			buttons[slot_index].text = "SLOT %d - %s\n[BUILDING]\nBuild: %.1fs remaining" % [slot_index + 1, part.card_data.display_name, part.get_build_remaining()]
+		else:
+			buttons[slot_index].text = "%sSLOT %d - %s\nDMG %d | HP %d/%d | Fire %ss\nNext: %.1fs%s" % [target_prefix, slot_index + 1, part.card_data.display_name, part.card_data.damage, part.current_health, part.max_health, _format_activation_interval(part.card_data.activation_interval), part.get_activation_remaining(), target_text]
+		buttons[slot_index].disabled = not active or (not human_controlled and (part == null or part.is_constructing))
 		trash_buttons[slot_index].disabled = not active or not human_controlled or part == null
 
 
@@ -507,11 +512,8 @@ func _refresh_activation_displays() -> void:
 	_refresh_slots()
 
 
-func _on_ai_card_played(card_name: String, slot_index: int, replaced: bool, old_part_name: String) -> void:
-	if replaced:
-		feedback_label.text = "AI replaced %s with %s in Slot %d." % [old_part_name, card_name, slot_index + 1]
-	else:
-		feedback_label.text = "AI installed %s in Slot %d." % [card_name, slot_index + 1]
+func _on_ai_card_played(card_name: String, slot_index: int) -> void:
+	feedback_label.text = "AI started building %s in Slot %d." % [card_name, slot_index + 1]
 
 
 func _format_activation_interval(seconds: float) -> String:
@@ -555,7 +557,7 @@ func _refresh_target_presentation() -> void:
 
 
 func _selected_weapon_targets_enemy_slot(enemy_slot_index: int) -> bool:
-	return selected_weapon_part != null and selected_weapon_part.target_type == MechPart.TargetType.PART and selected_weapon_part.target_slot_index == enemy_slot_index
+	return selected_weapon_part != null and not selected_weapon_part.is_constructing and selected_weapon_part.target_type == MechPart.TargetType.PART and selected_weapon_part.target_slot_index == enemy_slot_index
 
 
 func _get_weapon_target_text(weapon: MechPart) -> String:
@@ -563,7 +565,7 @@ func _get_weapon_target_text(weapon: MechPart) -> String:
 		return "Enemy Mech"
 	if match_controller.player_2.mech.is_valid_slot(weapon.target_slot_index):
 		var enemy_part: MechPart = match_controller.player_2.mech.slots[weapon.target_slot_index]
-		if enemy_part != null and enemy_part == weapon.target_part:
+		if enemy_part != null and not enemy_part.is_constructing and enemy_part == weapon.target_part:
 			return "%s (Enemy Slot %d)" % [enemy_part.card_data.display_name, weapon.target_slot_index + 1]
 	return "Enemy Mech"
 

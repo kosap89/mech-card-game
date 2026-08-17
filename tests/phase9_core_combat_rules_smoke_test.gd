@@ -67,16 +67,10 @@ func _init() -> void:
 	_check(controller.player_1.current_scrap == 2, "Cost 3 Trash return rounds ceil(3 * 0.5) to 2 Scrap")
 
 	controller.restart_match()
-	old_part = MechPart.new(autocannon, controller.player_1, 0)
-	controller.player_1.mech.install_part(old_part, 0)
-	controller.player_1.hand.append(autocannon)
-	controller.player_1.current_scrap = 1
-	_check(controller.try_play_card(1, autocannon, 0) == PlayerState.PlayPartResult.REPLACED, "Replace can afford a card using rounded returned Scrap")
-	_check(controller.player_1.current_scrap == 0 and controller.player_1.mech.slots[0] != old_part, "Replace applies integer return atomically and installs a fresh part")
-
-	controller.restart_match()
 	var light_cannon: CardData = load("res://data/cards/light_cannon.tres")
-	controller.player_1.mech.install_part(MechPart.new(light_cannon, controller.player_1, 0), 0)
+	var light_part := MechPart.new(light_cannon, controller.player_1, 0)
+	controller.player_1.mech.install_part(light_part, 0)
+	light_part.advance_construction(light_cannon.build_time)
 	controller._process(light_cannon.activation_interval)
 	_check(controller.player_1.total_mech_damage_dealt == light_cannon.damage, "Installed Light Cannon combat works independently")
 	controller.damage_debug_part(1, 0, light_cannon.max_health)

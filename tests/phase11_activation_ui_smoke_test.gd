@@ -11,12 +11,14 @@ func _init() -> void:
 	var heavy: CardData = load("res://data/cards/heavy_cannon.tres")
 	var test_player := PlayerState.new(1, 1000, 0, load("res://data/cards/test_deck.tres"), 3.0)
 	var light_part := MechPart.new(light, test_player, 0)
+	light_part.advance_construction(light.build_time)
 	_check(absf(light_part.get_activation_remaining() - light.activation_interval) < EPSILON, "New installed weapon starts at its full activation interval")
 	light_part.advance_activation(0.5)
 	_check(absf(light_part.get_activation_remaining() - 1.5) < EPSILON, "Installed weapon countdown decreases from runtime elapsed state")
 	_check(light_part.advance_activation(1.5) == 1 and absf(light_part.get_activation_remaining() - light.activation_interval) < EPSILON, "Firing naturally resets the displayed remaining time")
 
 	var heavy_part := MechPart.new(heavy, test_player, 1)
+	heavy_part.advance_construction(heavy.build_time)
 	light_part.advance_activation(0.25)
 	heavy_part.advance_activation(1.0)
 	_check(absf(light_part.get_activation_remaining() - 1.75) < EPSILON and absf(heavy_part.get_activation_remaining() - 3.0) < EPSILON, "Multiple weapons maintain independent countdown state")
@@ -42,15 +44,20 @@ func _init() -> void:
 	controller.restart_match()
 	controller.balance.builtin_cannon_activation_interval_seconds = 10000.0
 	light_part = MechPart.new(light, controller.player_1, 0)
+	light_part.advance_construction(light.build_time)
 	controller.player_1.mech.install_part(light_part, 0)
 	light_part.advance_activation(0.7)
 	controller.player_1.hand.append(heavy)
 	controller.player_1.current_scrap = heavy.cost
-	_check(controller.try_play_card(1, heavy, 0) == PlayerState.PlayPartResult.REPLACED, "Test setup replaces an installed weapon")
+	_check(controller.try_trash_part(1, 0) == PlayerState.TrashPartResult.SUCCESS, "Test setup clears the occupied slot")
+	_check(controller.try_play_card(1, heavy, 0) == PlayerState.PlayPartResult.SUCCESS, "Weapon can be built in the emptied slot")
 	var replacement: MechPart = controller.player_1.mech.slots[0]
-	_check(replacement.card_data == heavy and absf(replacement.get_activation_remaining() - heavy.activation_interval) < EPSILON, "Replace exposes a fresh full countdown")
+	_check(replacement.card_data == heavy and replacement.is_constructing, "New weapon begins in construction")
+	replacement.advance_construction(heavy.build_time)
+	_check(absf(replacement.get_activation_remaining() - heavy.activation_interval) < EPSILON, "Completed weapon exposes a fresh full countdown")
 	_check(controller.try_trash_part(1, 0) == PlayerState.TrashPartResult.SUCCESS and controller.player_1.mech.slots[0] == null, "Trash removes the weapon and its runtime countdown")
 	light_part = MechPart.new(light, controller.player_1, 0)
+	light_part.advance_construction(light.build_time)
 	controller.player_1.mech.install_part(light_part, 0)
 	controller.damage_debug_part(1, 0, light.max_health)
 	_check(controller.player_1.mech.slots[0] == null, "Destruction removes the weapon and its runtime countdown")
@@ -83,8 +90,8 @@ func _test_countdown_ui(light: CardData, heavy: CardData) -> void:
 	main_scene.match_controller = controller
 	main_scene._ready()
 	_check("Next: 3.0s" in main_scene.p1_builtin_cannon.text and "Next: 3.0s" in main_scene.p2_builtin_cannon.text, "UI shows both Built-in Cannon countdowns")
-	controller.player_1.mech.install_part(MechPart.new(light, controller.player_1, 0), 0)
-	controller.player_2.mech.install_part(MechPart.new(heavy, controller.player_2, 0), 0)
+	controller.player_1.mech.install_part(_active_part(light, controller.player_1, 0), 0)
+	controller.player_2.mech.install_part(_active_part(heavy, controller.player_2, 0), 0)
 	_check("Next: 2.0s" in main_scene.p1_slot_buttons[0].text and "Next: 4.0s" in main_scene.p2_slot_buttons[0].text, "Both players show fresh installed-weapon countdowns")
 	_check(main_scene.p1_slot_buttons[0].get_parent().get_parent() is PanelContainer, "Installed weapon uses a card-like panel container")
 	_check(not main_scene.p1_slot_buttons[0].disabled and not main_scene.p2_slot_buttons[0].disabled and main_scene.p2_trash_buttons[0].disabled, "Player modules remain interactive and occupied enemy modules are targetable without enabling enemy Trash")
@@ -99,15 +106,21 @@ func _test_countdown_ui(light: CardData, heavy: CardData) -> void:
 
 	controller.try_trash_part(1, 0)
 	_check("EMPTY" in main_scene.p1_slot_buttons[0].text and "Next:" not in main_scene.p1_slot_buttons[0].text, "Trash immediately removes countdown presentation")
-	controller.player_1.mech.install_part(MechPart.new(light, controller.player_1, 0), 0)
+	controller.player_1.mech.install_part(_active_part(light, controller.player_1, 0), 0)
 	controller.damage_debug_part(1, 0, light.max_health)
 	_check("EMPTY" in main_scene.p1_slot_buttons[0].text and "Next:" not in main_scene.p1_slot_buttons[0].text, "Destruction leaves no ghost countdown")
 
-	controller.player_1.mech.install_part(MechPart.new(light, controller.player_1, 0), 0)
+	controller.player_1.mech.install_part(_active_part(light, controller.player_1, 0), 0)
 	controller.player_1.hand.append(heavy)
 	controller.player_1.current_scrap = heavy.cost
+	_check(controller.try_play_card(1, heavy, 0) == PlayerState.PlayPartResult.SLOT_OCCUPIED, "Occupied slot blocks construction")
+	controller.try_trash_part(1, 0)
 	controller.try_play_card(1, heavy, 0)
-	_check("Heavy Cannon" in main_scene.p1_slot_buttons[0].text and "Next: 4.0s" in main_scene.p1_slot_buttons[0].text, "Replace immediately shows the new weapon's fresh countdown")
+	_check("Heavy Cannon" in main_scene.p1_slot_buttons[0].text and "BUILDING" in main_scene.p1_slot_buttons[0].text, "New weapon immediately shows construction")
+	var built_heavy: MechPart = controller.player_1.mech.slots[0]
+	built_heavy.advance_construction(heavy.build_time)
+	main_scene._process(0.0)
+	_check("Next: 4.0s" in main_scene.p1_slot_buttons[0].text, "Completed weapon shows its fresh countdown")
 	controller.restart_match()
 	_check("EMPTY" in main_scene.p1_slot_buttons[0].text and "Next: 3.0s" in main_scene.p1_builtin_cannon.text, "Restart clears modules and resets Built-in Cannon presentation")
 	var margin: MarginContainer = main_scene.get_child(1)
@@ -119,3 +132,9 @@ func _test_countdown_ui(light: CardData, heavy: CardData) -> void:
 func _check(condition: bool, message: String) -> void:
 	if not condition:
 		failures.append(message)
+
+
+func _active_part(card: CardData, player: PlayerState, slot_index: int) -> MechPart:
+	var part := MechPart.new(card, player, slot_index)
+	part.advance_construction(card.build_time)
+	return part

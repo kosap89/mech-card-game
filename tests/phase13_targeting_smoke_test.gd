@@ -12,10 +12,12 @@ func _init() -> void:
 	var light: CardData = load("res://data/cards/light_cannon.tres")
 	var heavy: CardData = load("res://data/cards/heavy_cannon.tres")
 	var weapon := MechPart.new(light, controller.player_1, 0)
+	weapon.advance_construction(light.build_time)
 	controller.player_1.mech.install_part(weapon, 0)
 	_check(weapon.target_type == MechPart.TargetType.MAIN_MECH, "Installed Player 1 weapons default to the enemy main mech")
 	_check(not controller.set_player_1_weapon_target_part(0, 0), "An empty enemy slot cannot be targeted")
 	var enemy_part := MechPart.new(heavy, controller.player_2, 0)
+	enemy_part.advance_construction(heavy.build_time)
 	controller.player_2.mech.install_part(enemy_part, 0)
 	_check(controller.set_player_1_weapon_target_part(0, 0), "An occupied enemy slot can be targeted")
 	var enemy_mech_health := controller.player_2.mech.current_health

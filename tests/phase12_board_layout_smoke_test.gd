@@ -28,8 +28,8 @@ func _init() -> void:
 	_check(main_scene.debug_panel.get_child(0) is ScrollContainer, "Development controls use low-priority vertical scrolling when space is constrained")
 
 	var light: CardData = load("res://data/cards/light_cannon.tres")
-	controller.player_1.mech.install_part(MechPart.new(light, controller.player_1, 0), 0)
-	controller.player_2.mech.install_part(MechPart.new(light, controller.player_2, 0), 0)
+	controller.player_1.mech.install_part(_active_part(light, controller.player_1, 0), 0)
+	controller.player_2.mech.install_part(_active_part(light, controller.player_2, 0), 0)
 	controller._process(0.5)
 	main_scene._process(0.0)
 	_check("Next: 1.5s" in main_scene.p1_slot_buttons[0].text and "Next: 1.5s" in main_scene.p2_slot_buttons[0].text, "Activation countdowns continue updating on both board halves")
@@ -67,3 +67,9 @@ func _init() -> void:
 func _check(condition: bool, message: String) -> void:
 	if not condition:
 		failures.append(message)
+
+
+func _active_part(card: CardData, player: PlayerState, slot_index: int) -> MechPart:
+	var part := MechPart.new(card, player, slot_index)
+	part.advance_construction(card.build_time)
+	return part

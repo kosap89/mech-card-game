@@ -13,3 +13,5 @@ enum CardType { PART }
 @export_range(1, 100000, 1) var max_health: int = 40
 @export_range(0, 100000, 1) var damage: int = 0
 @export_range(0.0, 3600.0, 0.1) var activation_interval: float = 0.0
+# TODO(balance): Phase 15 construction times are temporary MVP values.
+@export_range(0.0, 3600.0, 0.1) var build_time: float = 1.0

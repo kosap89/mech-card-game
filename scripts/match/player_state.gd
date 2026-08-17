@@ -8,7 +8,6 @@ enum PlayPartResult {
 	SLOT_OCCUPIED,
 	NOT_ENOUGH_SCRAP,
 	NOT_A_PART,
-	REPLACED,
 }
 
 enum TrashPartResult { SUCCESS, INVALID_SLOT, EMPTY_SLOT }
@@ -94,15 +93,10 @@ func remove_card_from_hand(card: CardData) -> bool:
 	return true
 
 
-func try_play_part(card: CardData, slot_index: int, scrap_return_fraction: float = 0.0) -> int:
-	var validation_result := validate_play_part(card, slot_index, scrap_return_fraction)
-	if validation_result not in [PlayPartResult.SUCCESS, PlayPartResult.REPLACED]:
+func try_play_part(card: CardData, slot_index: int) -> int:
+	var validation_result := validate_play_part(card, slot_index)
+	if validation_result != PlayPartResult.SUCCESS:
 		return validation_result
-	var old_part: MechPart = mech.slots[slot_index]
-	var scrap_return := 0 if old_part == null else calculate_scrap_return(old_part, scrap_return_fraction)
-	if old_part != null:
-		mech.take_part(slot_index)
-		add_scrap(scrap_return)
 	spend_scrap(card.cost)
 	remove_card_from_hand(card)
 	var part := MechPart.new(card, self, slot_index)
@@ -110,18 +104,18 @@ func try_play_part(card: CardData, slot_index: int, scrap_return_fraction: float
 	return validation_result
 
 
-func validate_play_part(card: CardData, slot_index: int, scrap_return_fraction: float = 0.0) -> int:
+func validate_play_part(card: CardData, slot_index: int) -> int:
 	if card == null or hand.find(card) < 0:
 		return PlayPartResult.INVALID_CARD
 	if card.card_type != CardData.CardType.PART:
 		return PlayPartResult.NOT_A_PART
 	if not mech.is_valid_slot(slot_index):
 		return PlayPartResult.INVALID_SLOT
-	var old_part: MechPart = mech.slots[slot_index]
-	var scrap_return := 0 if old_part == null else calculate_scrap_return(old_part, scrap_return_fraction)
-	if current_scrap + scrap_return < card.cost:
+	if not mech.is_slot_empty(slot_index):
+		return PlayPartResult.SLOT_OCCUPIED
+	if not can_afford(card.cost):
 		return PlayPartResult.NOT_ENOUGH_SCRAP
-	return PlayPartResult.SUCCESS if old_part == null else PlayPartResult.REPLACED
+	return PlayPartResult.SUCCESS
 
 
 func calculate_scrap_return(part: MechPart, scrap_return_fraction: float) -> int:

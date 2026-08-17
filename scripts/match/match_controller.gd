@@ -4,7 +4,7 @@ extends Node
 signal match_started
 signal match_ended(result_text: String)
 signal state_changed
-signal ai_card_played(card_name: String, slot_index: int, replaced: bool, old_part_name: String)
+signal ai_card_played(card_name: String, slot_index: int)
 signal player_1_weapon_targets_changed
 
 enum MatchState { READY, ACTIVE, ENDED }
@@ -99,7 +99,7 @@ func try_play_card(player_number: int, card: CardData, slot_index: int) -> int:
 	var player := get_player(player_number)
 	if player == null:
 		return PlayerState.PlayPartResult.INVALID_CARD
-	return player.try_play_part(card, slot_index, balance.scrap_return_fraction)
+	return player.try_play_part(card, slot_index)
 
 
 func try_trash_part(player_number: int, slot_index: int) -> int:
@@ -113,7 +113,7 @@ func try_trash_part(player_number: int, slot_index: int) -> int:
 
 func set_player_1_weapon_target_main_mech(weapon_slot_index: int) -> bool:
 	var weapon := _get_player_1_weapon(weapon_slot_index)
-	if match_state != MatchState.ACTIVE or weapon == null:
+	if match_state != MatchState.ACTIVE or weapon == null or weapon.is_constructing:
 		return false
 	weapon.target_main_mech()
 	player_1_weapon_targets_changed.emit()
@@ -122,7 +122,7 @@ func set_player_1_weapon_target_main_mech(weapon_slot_index: int) -> bool:
 
 func set_player_1_weapon_target_part(weapon_slot_index: int, enemy_slot_index: int) -> bool:
 	var weapon := _get_player_1_weapon(weapon_slot_index)
-	if match_state != MatchState.ACTIVE or weapon == null or not player_2.mech.is_valid_slot(enemy_slot_index):
+	if match_state != MatchState.ACTIVE or weapon == null or weapon.is_constructing or not player_2.mech.is_valid_slot(enemy_slot_index):
 		return false
 	var enemy_part: MechPart = player_2.mech.slots[enemy_slot_index]
 	if not weapon.target_enemy_part(enemy_slot_index, enemy_part):
@@ -154,7 +154,14 @@ func _update_player_combat(attacker: PlayerState, defender: PlayerState, delta: 
 		var part: MechPart = slot_value
 		if part == null:
 			continue
-		var activation_count := part.advance_activation(delta)
+		var activation_delta := delta
+		if part.is_constructing:
+			var construction_remaining := part.get_build_remaining()
+			if not part.advance_construction(delta):
+				continue
+			# Only real time after completion can advance the fresh activation timer.
+			activation_delta = maxf(0.0, delta - construction_remaining)
+		var activation_count := part.advance_activation(activation_delta)
 		for activation_index in activation_count:
 			if match_state != MatchState.ACTIVE:
 				return
@@ -192,7 +199,7 @@ func _validate_player_1_weapon_target(weapon: MechPart) -> void:
 func _is_player_1_weapon_target_valid(weapon: MechPart) -> bool:
 	if weapon == null or weapon.target_type == MechPart.TargetType.MAIN_MECH:
 		return true
-	return player_2.mech.is_valid_slot(weapon.target_slot_index) and player_2.mech.slots[weapon.target_slot_index] == weapon.target_part
+	return player_2.mech.is_valid_slot(weapon.target_slot_index) and player_2.mech.slots[weapon.target_slot_index] == weapon.target_part and not weapon.target_part.is_constructing
 
 
 func _get_player_1_weapon(slot_index: int) -> MechPart:
@@ -241,5 +248,5 @@ func get_state_name() -> String:
 	return ["Ready", "Match Active", "Match Ended"][match_state]
 
 
-func _on_ai_card_played(card_name: String, slot_index: int, replaced: bool, old_part_name: String) -> void:
-	ai_card_played.emit(card_name, slot_index, replaced, old_part_name)
+func _on_ai_card_played(card_name: String, slot_index: int) -> void:
+	ai_card_played.emit(card_name, slot_index)

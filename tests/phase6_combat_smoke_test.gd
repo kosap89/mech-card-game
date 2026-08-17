@@ -101,6 +101,7 @@ func _new_controller() -> MatchController:
 func _install_test_part(player: PlayerState, card: CardData, slot_index: int) -> MechPart:
 	var part := MechPart.new(card, player, slot_index)
 	_check(player.mech.install_part(part, slot_index), "Test part installs in an empty slot")
+	part.advance_construction(card.build_time)
 	return part
 
 
